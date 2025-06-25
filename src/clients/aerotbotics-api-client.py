@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 from http_client import HttpClient
-from utils.timer import start_time_in_ms, log_elapsed_time_in_ms
+from utils.time_utils import start_time_in_ms, log_elapsed_time_in_ms
 
 class AeroboticsAPIClient(HttpClient):
     async def get_tree_survey(self, survey_id: str) -> Dict[str, Any]:

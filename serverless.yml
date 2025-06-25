@@ -1,0 +1,26 @@
+service: rebecca-lain-missing-trees
+
+provider:
+  name: aws
+  runtime: python3.11
+  region: af-south-1
+  stage: dev
+  timeout: 10
+
+functions:
+  missing_trees:
+    handler: handler.missing_trees
+    events:
+      - http:
+          path: missing-trees
+          method: get
+          cors: true
+
+plugins:
+  - serverless-python-requirements
+
+custom:
+  pythonRequirements:
+    dockerizePip: true
+    zip: true
+    slim: true

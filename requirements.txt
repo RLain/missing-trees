@@ -1,0 +1,6 @@
+aiohttp
+boto3
+environs
+flask
+pytest
+requests

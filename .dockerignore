@@ -1,0 +1,6 @@
+__pycache__/
+.venv/
+.serverless/
+*.pyc
+*.pyo
+*.pyd

@@ -1,0 +1,57 @@
+version: v1.0
+name: Initial Pipeline
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+auto_cancel:
+  running:
+    when: 'true'
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+  env_vars:
+    - name: NODE_ENV
+      value: test
+blocks:
+  - name: Setup dependencies
+    dependencies: []
+    task:
+      jobs:
+        - name: Install and store
+          commands:
+            - npm ci
+            - cache store
+  - name: Linting
+    dependencies:
+      - Setup dependencies
+    task:
+      prologue:
+        commands:
+          - cache restore
+      jobs:
+        - name: 'Lint everything'
+          commands:
+            - npm run lint
+
+  - name: Tests
+    dependencies:
+      - Linting
+    task:
+      secrets:
+        - name: AWS ProServices Sandbox
+      prologue:
+        commands:
+          - cache restore
+          - mv .env.sample .env
+      jobs:
+        - name: 'Unit & Integration tests'
+          commands:
+            - npm run test:unit
+
+promotions:
+  - name: Promote to staging
+    pipeline_file: deploy_to_staging.yml
+    auto_promote:
+      when: branch = 'main' AND result = 'passed'

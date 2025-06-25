@@ -3,4 +3,5 @@ boto3
 environs
 flask
 pytest
+pytest-asyncio
 requests

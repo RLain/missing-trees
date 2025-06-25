@@ -1,4 +1,4 @@
-from src.handler import missing_trees
+from handler import missing_trees
 
 def test_missing_trees():
     response = missing_trees({}, {})

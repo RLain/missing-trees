@@ -61,15 +61,20 @@ To run unit tests run `$ make test`
 You shoud see an outcome similar to:
 
 ```bash
-docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app missing_trees pytest src/tests
 ============================= test session starts ==============================
-platform linux -- Python 3.11.13, pytest-8.4.1, pluggy-1.6.0
+platform linux -- Python 3.11.13, pytest-8.4.1, pluggy-1.6.0 -- /usr/local/bin/python3.11
+cachedir: .pytest_cache
 rootdir: /app
-collected 1 item
+plugins: asyncio-1.0.0
+asyncio: mode=Mode.STRICT, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collecting ... collected 4 items
 
-src/tests/test_*.py .                                                    [100%]
+src/tests/test_*.py::test_missing_trees PASSED                           [ 25%]
+src/tests/utils/test_timer.py::test_sleep PASSED                         [ 50%]
+src/tests/utils/test_timer.py::test_start_and_elapsed_time_in_ms PASSED  [ 75%]
+src/tests/utils/test_timer.py::test_log_elapsed_time_in_ms_logs_message PASSED [100%]
 
-============================== 1 passed in 0.01s ===============================
+============================== 4 passed in 0.20s ===============================
 ```
 
 ### Integration tests

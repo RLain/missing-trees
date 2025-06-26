@@ -6,16 +6,15 @@ import pandas as pd
 import geopandas as gpd
 import math
 
-# Your existing outer_polygon and other logic here...
 
 def missing_trees(event, context):
     print("Initiation: Reached missing trees")
-    # Example tree data, replace with real input from event or elsewhere
+    # TODO: Replace with real Aerobotics data
     trees = [{"lat": -32.3, "lng": 18.8, "area": 20}, {"lat": -32.31, "lng": 18.81, "area": 25}]
 
     tree_polygons = create_tree_polygons(trees)
     
-    print("Passed: Created tree_polygons")
+    print("Passed: Created tree_polygons", tree_polygons)
 
 
     # Suppose you have outer_polygon and gap_polygons computed as before

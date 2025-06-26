@@ -1,52 +1,38 @@
 import folium
-from shapely.geometry import mapping
 
-def create_map(tree_polygons, outer_polygon, gap_polygons, center_lat=-32.315, center_lng=18.815):
-    """
-    Creates a folium map visualizing the outer polygon, tree polygons, and gap polygons.
-
-    Parameters:
-        tree_polygons (list): List of Shapely Polygons for trees
-        outer_polygon (Polygon): Shapely Polygon of the outer boundary
-        gap_polygons (list): List of Shapely Polygons for gaps
-        center_lat (float): Latitude to center the map
-        center_lng (float): Longitude to center the map
-
-    Returns:
-        folium.Map object
-    """
-    m = folium.Map(location=[center_lat, center_lng], zoom_start=15)
+def create_map(tree_polygons, outer_polygon, gap_polygons):
+    centroid = outer_polygon.centroid
+    folium_map = folium.Map(location=[centroid.y, centroid.x], zoom_start=16, tiles='Esri.WorldImagery')
 
     folium.GeoJson(
-        mapping(outer_polygon),
+        outer_polygon,
         name="Outer Polygon",
-        style_function=lambda feature: {
-            'color': 'black',
-            'weight': 2,
-            'fill': False
+        style_function=lambda x: {
+            "color": "blue", "fill": False, "weight": 2
         }
-    ).add_to(m)
+    ).add_to(folium_map)
+    
+    print("create_map_tree_polygons", tree_polygons)
 
     for poly in tree_polygons:
         folium.GeoJson(
-            mapping(poly),
-            style_function=lambda feature: {
-                'color': 'green',
-                'weight': 1,
-                'fillColor': 'green',
-                'fillOpacity': 0.5
+            poly,
+            name="Tree",
+            style_function=lambda x: {
+                "color": "green", "fillColor": "green", "fillOpacity": 0.5, "weight": 1
             }
-        ).add_to(m)
+        ).add_to(folium_map)
 
-    for poly in gap_polygons:
+    for gap in gap_polygons:
         folium.GeoJson(
-            mapping(poly),
-            style_function=lambda feature: {
-                'color': 'red',
-                'weight': 1,
-                'fillColor': 'red',
-                'fillOpacity': 0.5
+            gap,
+            name="Gap",
+            style_function=lambda x: {
+                "color": "red", "fillColor": "red", "fillOpacity": 0.5, "weight": 1
             }
-        ).add_to(m)
+        ).add_to(folium_map)
 
-    return m
+    folium.LayerControl().add_to(folium_map)
+    folium.Marker([centroid.y, centroid.x], tooltip="Map center").add_to(folium_map)
+
+    return folium_map

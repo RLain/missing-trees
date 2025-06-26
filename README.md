@@ -18,7 +18,8 @@ Please follow these important first steps:
 2. Set up your local `env` file.
 3. Run $ make build
 4. Then you can spin up the container and execute the handler using $ make run-handler. This will:
-  a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data
+  a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data to make building easier
+  b) Execute the GET requests against the Aerobotics API and store the response on tree_survey_data.json (purely to stop me hammering the API during the build)
 
 Addition commands:
 • Exiting a docker container $ exit

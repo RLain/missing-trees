@@ -2,6 +2,10 @@ aiohttp
 boto3
 environs
 flask
+folium
+geopandas
+pandas
 pytest
 pytest-asyncio
 requests
+shapely

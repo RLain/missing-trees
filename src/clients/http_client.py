@@ -11,6 +11,8 @@ class HttpClient:
             "Authorization": f"Bearer {self.aerobotics_api_key}",
             "Content-Type": "application/json"
         }
+        
+        print("AEROBOTICS_BASE_URL", self.aerobotics_api_base_url)
 
     async def get(self, url: str, json: bool = True):
         full_url = f"{self.aerobotics_api_base_url}{url}"

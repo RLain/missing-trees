@@ -175,4 +175,6 @@ pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python
 
+# Added by Becca
 src/tree_survey_data.json
+tmp/tree_gaps_map.html

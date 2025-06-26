@@ -33,7 +33,6 @@ def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=
     gdf_trees = gpd.GeoSeries(tree_polygons, crs="EPSG:4326").to_crs(epsg=epsg)
     trees_proj = gdf_trees.unary_union
 
-    # Extract boundaries
     outer_boundary = outer_proj.boundary
     tree_boundaries = [poly.boundary for poly in gdf_trees]
 

@@ -1,5 +1,10 @@
 # 🌳 Welcome to Rebecca Lain's missing tree API
 
+## 🗣️ Context sharing
+
+- EPSG:32734 = UTM Zone 34S (metric)
+- EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long)
+
 ## ⬇️ Things to install
 
 - Docker (For Mac)[https://docs.docker.com/desktop/setup/install/mac-install/]

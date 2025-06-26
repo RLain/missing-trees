@@ -1,55 +1,81 @@
+from clients.aerobotics_api_client import AeroboticsAPIClient
 from utils.visualisation import create_map
-from utils.spatial import create_tree_polygons
+from utils.spatial import create_tree_polygons, find_missing_tree_gaps
 from shapely.geometry import Polygon
 from shapely.ops import unary_union
 import pandas as pd
 import geopandas as gpd
-import math
+import asyncio
+from pathlib import Path
+from clients.aerobotics_api_client import AeroboticsAPIClient
+from utils.spatial import create_tree_polygons, find_missing_tree_gaps
+import json
 
+#TODO: Pass into API
+orchard_id="216269"
 
-def missing_trees(event, context):
-    print("Initiation: Reached missing trees")
-    # TODO: Replace with real Aerobotics data
-    trees = [{"lat": -32.3, "lng": 18.8, "area": 20}, {"lat": -32.31, "lng": 18.81, "area": 25}]
+async def missing_trees(event, context):
+    # TODO: Return orchard_id = event.get("orchard_id", "216269")
 
-    tree_polygons = create_tree_polygons(trees)
+    client = AeroboticsAPIClient()
     
-    print("Passed: Created tree_polygons", tree_polygons)
-
-
-    # Suppose you have outer_polygon and gap_polygons computed as before
-    # (copy or import the polygon definitions as needed)
+    survey = await client.get_survey(orchard_id)
     
-    # For demo, recreate your outer polygon here:
-    coord_str = "18.825688993836707,-32.32741477565738 18.82707301368839,-32.32771395090236 18.82696840753681,-32.32805392157161 18.826920127774542,-32.32810831676022 18.82668945779926,-32.328899309768175 18.82535103550083,-32.32913728625483 18.825165963078803,-32.32913048693532 18.825688993836707,-32.32741477565738"
-    coords = [(float(lng), float(lat)) for lng, lat in (pair.split(',') for pair in coord_str.split())]
+    coords = [(float(lng), float(lat)) for lng, lat in (pair.split(',') for pair in survey["results"][0]["polygon"].split())]
     assert coords[0] == coords[-1], "Polygon ring must be closed"
     outer_polygon = Polygon(coords)
+    
+    survey_id = survey["results"][0]["id"]
+    json_path = Path(__file__).parent / "tree_survey_data.json"
 
-    trees_union = unary_union(tree_polygons)
-    gaps = outer_polygon.difference(trees_union)
+    # To stop me unecessarily invoking the API as the dummy data is not changing
+    if json_path.exists() and json_path.stat().st_size > 0:
+        with open(json_path) as f:
+            tree_survey = json.load(f)
+    else:
+        tree_survey = await client.get_tree_survey(survey_id)
+        with open(json_path, "w") as f:
+            json.dump(tree_survey, f, indent=2)
+    
+    tree_data = [
+        {
+            "lat": tree["lat"],
+            "lng": tree["lng"],
+            "area": tree["area"],
+        }
+        for tree in tree_survey["results"]
+    ]
 
-    gap_polygons = []
-    from shapely.geometry import MultiPolygon, Polygon as ShapelyPolygon
-    if isinstance(gaps, ShapelyPolygon):
-        if gaps.area > 10:
-            gap_polygons.append(gaps)
-    elif isinstance(gaps, MultiPolygon):
-        gap_polygons = [g for g in gaps.geoms if g.area > 10]
+    #TODO: Add error handling to end if no tree data is returning
+    tree_polygons = create_tree_polygons(tree_data)
+    gaps = find_missing_tree_gaps(outer_polygon, tree_polygons)
 
-    # Create folium map
-    folium_map = create_map(tree_polygons, outer_polygon, gap_polygons)
+    print("gap polygons returned by find_missing_tree_gaps:", gaps)
+
+    # Use gaps directly, since they're already filtered
+    for i, gap in enumerate(gaps):
+        print(f"Gap {i} area (m²): {gap.area}")
+
+    folium_map = create_map(tree_polygons, outer_polygon, gaps)
 
     # Save map to HTML file (you can adjust this path)
     output_path = "/tmp/tree_gaps_map.html"
     folium_map.save(output_path)
 
+    # Example return: number of trees and gaps found
     return {
-        "statusCode": 200,
-        "body": f"Map generated and saved to {output_path}"
+        "tree_count": len(tree_polygons),
+        "gap_count": len(gaps),
+        #"gaps": [gap.wkt for gap in gaps],
     }
 
 
+# For local testing
 if __name__ == "__main__":
-    response = missing_trees({}, {})
-    print(response)
+    import sys
+
+    event = {"orchard_id": orchard_id}
+    context = {}
+
+    result = asyncio.run(missing_trees(event, context))
+    print("Lambda handler result:", result)

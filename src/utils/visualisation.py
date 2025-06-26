@@ -12,8 +12,6 @@ def create_map(tree_polygons, outer_polygon, gap_polygons):
         }
     ).add_to(folium_map)
     
-    print("create_map_tree_polygons", tree_polygons)
-
     for poly in tree_polygons:
         folium.GeoJson(
             poly,

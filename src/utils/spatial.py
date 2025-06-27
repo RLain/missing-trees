@@ -7,6 +7,9 @@ from sklearn.cluster import DBSCAN
 from pyproj import Transformer
 import numpy as np
 from collections import defaultdict
+from scipy.spatial.distance import pdist
+from scipy.spatial import Voronoi
+
 
 def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
     df = pd.DataFrame(tree_data)
@@ -31,8 +34,7 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
 
     return list(gdf["geometry"])
 
-
-# def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=32734):
+    # def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=32734):
     gdf_outer = gpd.GeoSeries([outer_polygon], crs="EPSG:4326").to_crs(epsg=epsg)
     outer_proj = gdf_outer.iloc[0]
 
@@ -70,10 +72,12 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
     gdf_gaps = gpd.GeoSeries(gap_polygons, crs=f"EPSG:{epsg}").to_crs(epsg=4326)
     return list(gdf_gaps)
 
+
 def reproject_gaps_to_latlng(gap_polygons_proj):
     gdf = gpd.GeoDataFrame(geometry=gap_polygons_proj, crs="EPSG:32734")
     gdf_latlng = gdf.to_crs(epsg=4326)
     return list(gdf_latlng.geometry)
+
 
 def create_missing_tree_polygons(
     missing_coords: list[dict],
@@ -86,7 +90,7 @@ def create_missing_tree_polygons(
     # Create Point geometries from dicts: Point(longitude, latitude)
     df = gpd.GeoDataFrame(
         geometry=[Point(coord["lng"], coord["lat"]) for coord in missing_coords],
-        crs="EPSG:4326"
+        crs="EPSG:4326",
     )
     df_metric = df.to_crs(epsg=epsg_metric)
 
@@ -96,176 +100,222 @@ def create_missing_tree_polygons(
     df_latlng = df_metric.to_crs("EPSG:4326")
     return list(df_latlng.geometry)
 
-def find_missing_tree_positions(tree_data: list[dict], outer_polygon,
-                               epsg_metric: int = 32734,
-                               row_spacing: float = 6.1,
-                               tree_spacing: float = 3.0,
-                               tolerance: float = 4.5) -> dict:
+def find_missing_tree_positions(tree_data: list[dict], 
+                                outer_polygon,
+                                epsg_metric: int = 32734,
+                                tree_spacing: float = 4.0) -> dict:
     
     tree_df = pd.DataFrame(tree_data)
     tree_gdf = gpd.GeoDataFrame(tree_df,
                                 geometry=gpd.points_from_xy(tree_df["lng"], tree_df["lat"]),
                                 crs="EPSG:4326")
     
-    print(f"Total input trees: {len(tree_gdf)}")  # DEBUG
-
+    print(f"Total input trees: {len(tree_gdf)}")
     
     tree_gdf_proj = tree_gdf.to_crs(epsg=epsg_metric)
     outer_proj = gpd.GeoSeries([outer_polygon], crs="EPSG:4326").to_crs(epsg=epsg_metric).iloc[0]
     
-    # 2. Analyze existing tree pattern to infer grid orientation
-    grid_angle, actual_row_spacing = analyze_tree_pattern(tree_gdf_proj)
+    missing_positions = find_gaps_in_orchard(tree_gdf_proj, outer_proj, tree_spacing)
     
-    # 3. Generate expected grid based on inferred pattern
-    expected_positions = generate_expected_grid(outer_proj, tree_gdf_proj, 
-                                              grid_angle, actual_row_spacing, tree_spacing)
+    print(f"Found {len(missing_positions)} potential missing tree positions")
     
-    print(f"Expected grid positions: {len(expected_positions)}")  # DEBUG
+    return format_results(tree_gdf_proj, missing_positions, epsg_metric)
 
-    # 4. Match existing trees to expected positions
-    matched_trees, unmatched_expected = match_trees_to_grid(tree_gdf_proj, expected_positions, tolerance)
-    print(f"Successfully matched trees: {len(matched_trees)}")  # DEBUG
-    print(f"Unmatched expected positions: {len(unmatched_expected)}")  # DEBUG
+def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
+    """Create a custom inward buffer with larger buffers on bottom and left edges"""
+    minx, miny, maxx, maxy = polygon.bounds
     
-    # 5. Identify missing positions
-    missing_positions = identify_missing_trees(unmatched_expected, outer_proj)
+    # Get exterior coordinates
+    exterior_coords = list(polygon.exterior.coords)
+    buffered_coords = []
     
-    return format_results(matched_trees, missing_positions, epsg_metric)
-
-
-def analyze_tree_pattern(tree_gdf_proj):
-    """Analyze existing trees to determine grid orientation and spacing."""
-    coords = [(pt.x, pt.y) for pt in tree_gdf_proj.geometry]
+    # Calculate tolerances for edge detection
+    width = maxx - minx
+    height = maxy - miny
+    horizontal_tolerance = width * 0.1   # 10% of width
+    vertical_tolerance = height * 0.1    # 10% of height
+    
+    for i, (x, y) in enumerate(exterior_coords[:-1]):  # Skip last point (duplicate of first)
+        # Determine which edge this point belongs to
+        is_bottom = y <= (miny + vertical_tolerance)
+        is_left = x <= (minx + horizontal_tolerance)
+        is_top = y >= (maxy - vertical_tolerance)
+        is_right = x >= (maxx - horizontal_tolerance)
         
-    # Cluster by Y coordinate to find rows
-    y_coords = np.array([[pt[1]] for pt in coords])
-    row_clusters = DBSCAN(eps=3.0, min_samples=2).fit(y_coords)
+        # Calculate inward movement based on edge
+        if is_bottom and is_left:
+            # Corner: apply both buffers
+            buffered_coords.append((x + left_buffer, y + bottom_buffer))
+        elif is_bottom:
+            # Bottom edge: move up
+            buffered_coords.append((x, y + bottom_buffer))
+        elif is_left:
+            # Left edge: move right
+            buffered_coords.append((x + left_buffer, y))
+        else:
+            # Top or right edges: use normal buffer toward center
+            center_x = minx + width / 2
+            center_y = miny + height / 2
+            
+            # Move toward center by normal_buffer distance
+            to_center_x = center_x - x
+            to_center_y = center_y - y
+            distance = np.sqrt(to_center_x**2 + to_center_y**2)
+            
+            if distance > 0:
+                norm_x = to_center_x / distance
+                norm_y = to_center_y / distance
+                buffered_coords.append((x + norm_x * normal_buffer, y + norm_y * normal_buffer))
+            else:
+                buffered_coords.append((x, y))
     
-    # Calculate actual row spacing from clusters
-    unique_labels = set(row_clusters.labels_) - {-1}
-    if len(unique_labels) < 2:
-        return 0, 6.5  # Default if can't determine
+    # Close the polygon
+    buffered_coords.append(buffered_coords[0])
     
-    row_centers = []
-    for label in unique_labels:
-        mask = row_clusters.labels_ == label
-        row_y = np.mean([coords[i][1] for i in range(len(coords)) if mask[i]])
-        row_centers.append(row_y)
-    
-    row_centers.sort()
-    actual_spacing = np.mean(np.diff(row_centers)) if len(row_centers) > 1 else 6.5
-    
-    # Determine grid angle (0 for horizontal rows, could be extended for angled orchards)
-    grid_angle = 0  # Simplified for now
-    
-    return grid_angle, actual_spacing
+    try:
+        return Polygon(buffered_coords)
+    except:
+        # Fallback to simple buffer if custom buffer fails
+        return polygon.buffer(-normal_buffer)
 
-def generate_expected_grid(outer_polygon, existing_trees, grid_angle, row_spacing, tree_spacing):
-    """Generate all expected tree positions based on inferred pattern."""
+def find_gaps_in_orchard(existing_trees, outer_polygon, spacing=4.0):    
+    existing_coords = [(pt.x, pt.y) for pt in existing_trees.geometry]
+    existing_points = np.array(existing_coords)
     minx, miny, maxx, maxy = outer_polygon.bounds
     
-    expected_positions = []
+    # Create buffer zones around existing trees to prevent overlap
+    tree_radius = spacing * 0.4  # Tree canopy radius (adjust based on tree type)
+    existing_tree_buffers = [Point(x, y).buffer(tree_radius) for x, y in existing_coords]
     
-    # Generate grid points
-    y = miny + row_spacing/2  # Start with half spacing from edge
-    while y < maxy:
-        x = minx + tree_spacing/2  # Start with half spacing from edge
-        while x < maxx:
-            point = Point(x, y)
-            # Only include if point is within orchard boundary
-            if outer_polygon.contains(point) or outer_polygon.touches(point):
-                expected_positions.append({
-                    'geometry': point,
-                    'x': x,
-                    'y': y,
-                    'expected_row': int((y - miny) / row_spacing) + 1,
-                    'expected_col': int((x - minx) / tree_spacing) + 1
-                })
-            x += tree_spacing
-        y += row_spacing
+    grid_spacing = spacing * 0.75  # Adjusted for better detection accuracy
     
-    return expected_positions
+    x_coords = np.arange(minx, maxx + grid_spacing, grid_spacing)
+    y_coords = np.arange(miny, maxy + grid_spacing, grid_spacing)
+    
+    potential_positions = []
+    
+    for y in y_coords:
+        for x in x_coords:
+            test_point = Point(x, y)
+            
+            # Only consider points inside the orchard boundary
+            if not outer_polygon.contains(test_point):
+                continue
+            
+            # Check if this position overlaps with any existing tree
+            overlaps_existing = any(buffer.contains(test_point) for buffer in existing_tree_buffers)
+            if overlaps_existing:
+                continue
+                
+            # Check distances to existing trees
+            distances_to_existing = np.sqrt((existing_points[:, 0] - x)**2 + 
+                                          (existing_points[:, 1] - y)**2)
+            
+            min_distance = np.min(distances_to_existing)
+            
+            # Position is a candidate if:
+            # 1. It's far enough from existing trees to suggest a gap
+            # 2. But not so far that it's outside the planting pattern
+            min_threshold = spacing * 0.8  # Minimum distance to consider a gap
+            max_threshold = spacing * 2.5  # Maximum distance to still be part of orchard
+            
+            if min_threshold < min_distance < max_threshold:
+                # Additional check: ensure we're not too close to multiple trees
+                nearby_trees = np.sum(distances_to_existing < spacing * 1.5)
+                
+                # If surrounded by too many trees, likely not a missing spot
+                if nearby_trees < 4:  # Adjust based on planting pattern
+                    potential_positions.append({
+                        'geometry': test_point,
+                        'x': x,
+                        'y': y,
+                        'distance_to_nearest': min_distance,
+                        'nearby_tree_count': nearby_trees
+                    })
+    
+    # Filter out positions too close to orchard edges with custom buffers
+    normal_buffer_distance = spacing * 2  # Normal buffer for right and top
+    bottom_buffer_distance = spacing * 3.5 # Larger buffer for bottom
+    left_buffer_distance = spacing * 3.0    # Larger buffer for left
+    
+    # Create custom buffered boundary
+    minx, miny, maxx, maxy = outer_polygon.bounds
+    
+    # Create a polygon with different buffer distances
+    from shapely.geometry import Polygon
+    
+    # Get the original boundary coordinates
+    exterior_coords = list(outer_polygon.exterior.coords)
+    
+    # Create inward-buffered boundary with custom buffers
+    inner_boundary = create_custom_buffer(outer_polygon, normal_buffer_distance, bottom_buffer_distance, left_buffer_distance)
+    
+    filtered_positions = []
+    for pos in potential_positions:
+        if inner_boundary.contains(pos['geometry']):
+            # Final overlap check with a smaller buffer for precision
+            final_check_radius = tree_radius * 0.8
+            test_buffer = pos['geometry'].buffer(final_check_radius)
+            
+            # Ensure no overlap with existing tree positions
+            no_final_overlap = not any(
+                test_buffer.intersects(Point(x, y).buffer(tree_radius * 0.5)) 
+                for x, y in existing_coords
+            )
+            
+            if no_final_overlap:
+                filtered_positions.append(pos)
+    
+    return filtered_positions
 
-def match_trees_to_grid(existing_trees, expected_positions, tolerance):
-    """Match existing trees to expected grid positions."""
-    matched = []
-    unmatched_expected = expected_positions.copy()
-    
-    for _, tree in existing_trees.iterrows():
-        tree_point = tree.geometry
-        best_match = None
-        min_distance = float('inf')
-        
-        for i, expected in enumerate(unmatched_expected):
-            distance = tree_point.distance(expected['geometry'])
-            if distance < tolerance and distance < min_distance:
-                min_distance = distance
-                best_match = i
-        
-        if best_match is not None:
-            expected_pos = unmatched_expected.pop(best_match)
-            matched.append({
-                'tree_index': tree.name,
-                'geometry': tree.geometry,
-                'expected_geometry': expected_pos['geometry'],
-                'row': expected_pos['expected_row'],
-                'col': expected_pos['expected_col'],
-                'distance_from_expected': min_distance
-            })
-    
-    return matched, unmatched_expected
-
-def identify_missing_trees(unmatched_expected, outer_polygon):
-    """Filter unmatched positions to identify likely missing trees."""
-    missing = []
-    
-    for pos in unmatched_expected:
-        # Additional validation - ensure position is well within orchard
-        # (not too close to edges where trees might legitimately be absent)
-        buffer_distance = 3.0  # meters
-        if outer_polygon.buffer(-buffer_distance).contains(pos['geometry']):
-            missing.append(pos)
-    
-    return missing
-
-def format_results(matched_trees, missing_positions, epsg_metric):
-    """Format results for visualization with confidence scoring."""
-    
-    # Convert matched trees back to WGS84
-    labeled_tree_coords = []
-    tree_points = []
-    
-    for match in matched_trees:
-        point_wgs = gpd.GeoSeries([match['geometry']], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
-        
-        labeled_tree_coords.append({
+def format_results(existing_trees, missing_positions, epsg_metric):    
+    # Convert existing trees back to WGS84
+    existing_coords = []
+    for idx, tree in existing_trees.iterrows():
+        point_wgs = gpd.GeoSeries([tree.geometry], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
+        existing_coords.append({
             "lat": point_wgs.y,
             "lng": point_wgs.x,
-            "label": f"{match['row']}.{match['col']}"
+            "id": idx
         })
-        
-        tree_points.append(Point(point_wgs.x, point_wgs.y))
     
-    # Convert missing positions with confidence scoring
     missing_coords = []
-    for pos in missing_positions:
+    for idx, pos in enumerate(missing_positions):
         point_wgs = gpd.GeoSeries([pos['geometry']], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
         
-        # Simple confidence based on position within orchard
-        # You can enhance this with more sophisticated logic
-        confidence = "high"  # Default
+        # Enhanced confidence calculation
+        distance = pos['distance_to_nearest']
+        nearby_count = pos.get('nearby_tree_count', 0)
+        
+        # Factor in both distance and surrounding tree density
+        if distance > 8.0 and nearby_count <= 1:
+            confidence = "high"
+        elif distance > 6.0 and nearby_count <= 2:
+            confidence = "medium"
+        elif distance > 4.5 and nearby_count <= 3:
+            confidence = "low"
+        else:
+            confidence = "very_low"
         
         missing_coords.append({
             "lat": point_wgs.y,
             "lng": point_wgs.x,
-            "row": pos['expected_row'],
-            "col": pos['expected_col'],
-            "confidence": confidence
+            "confidence": confidence,
+            "distance_to_nearest": round(distance, 1),
+            "nearby_tree_count": nearby_count
         })
+    
+    # Filter out very low confidence results
+    missing_coords = [m for m in missing_coords if m["confidence"] != "very_low"]
     
     return {
         "missing_coords": missing_coords,
-        "labeled_tree_coords": labeled_tree_coords,
-        "tree_points": tree_points,
-        "matched_trees": matched_trees
+        "existing_tree_coords": existing_coords,
+        "summary": {
+            "total_existing": len(existing_coords),
+            "total_missing": len(missing_coords),
+            "high_confidence": len([m for m in missing_coords if m["confidence"] == "high"]),
+            "medium_confidence": len([m for m in missing_coords if m["confidence"] == "medium"]),
+            "low_confidence": len([m for m in missing_coords if m["confidence"] == "low"])
+        }
     }

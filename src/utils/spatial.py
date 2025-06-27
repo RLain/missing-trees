@@ -1,21 +1,26 @@
 import pandas as pd
 import math
-from shapely.geometry import Polygon, MultiPolygon, LineString
+from shapely.geometry import Polygon, MultiPolygon, LineString, Point
 from shapely.ops import unary_union, polygonize
 import geopandas as gpd
+from sklearn.cluster import DBSCAN
+from pyproj import Transformer
+import numpy as np
+
 
 def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
     df = pd.DataFrame(tree_data)
 
-    gdf = gpd.GeoDataFrame(df, geometry=gpd.points_from_xy(df["lng"], df["lat"]), crs="EPSG:4326")
+    gdf = gpd.GeoDataFrame(
+        df, geometry=gpd.points_from_xy(df["lng"], df["lat"]), crs="EPSG:4326"
+    )
     gdf_metric = gdf.to_crs(epsg=epsg)
 
     def buffer_from_area(area):
         return math.sqrt(area / math.pi)
 
     gdf_metric["geometry"] = gdf_metric.apply(
-        lambda row: row.geometry.buffer(buffer_from_area(row["area"])),
-        axis=1
+        lambda row: row.geometry.buffer(buffer_from_area(row["area"])), axis=1
     )
 
     # print("Buffered geometries in metric CRS:")
@@ -23,10 +28,11 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
     # print("Buffered areas in m² (metric CRS):", gdf_metric["geometry"].area)
 
     gdf = gdf_metric.to_crs("EPSG:4326")
-  
+
     return list(gdf["geometry"])
 
-def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=32734):
+
+# def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=32734):
     gdf_outer = gpd.GeoSeries([outer_polygon], crs="EPSG:4326").to_crs(epsg=epsg)
     outer_proj = gdf_outer.iloc[0]
 
@@ -59,7 +65,6 @@ def find_missing_tree_gaps(outer_polygon, tree_polygons, min_gap_area=5.0, epsg=
     print(f"Total gap area (m²): {sum(g.area for g in gap_polygons)}")
     for i, gap in enumerate(gap_polygons):
         print(f"Gap {i} area (m²): {gap.area}")
-    
 
     # Return gaps reprojected back to lat/lng
     gdf_gaps = gpd.GeoSeries(gap_polygons, crs=f"EPSG:{epsg}").to_crs(epsg=4326)
@@ -70,3 +75,92 @@ def reproject_gaps_to_latlng(gap_polygons_proj):
     gdf = gpd.GeoDataFrame(geometry=gap_polygons_proj, crs="EPSG:32734")
     gdf_latlng = gdf.to_crs(epsg=4326)
     return list(gdf_latlng.geometry)
+
+
+def create_missing_tree_polygons(
+    missing_coords: list[dict],
+    placeholder_area_m2: float = 1.0,
+    epsg_metric: int = 32734,
+) -> list:
+    def buffer_radius(area):
+        return math.sqrt(area / math.pi)
+
+    # Create Point geometries from dicts: Point(longitude, latitude)
+    df = gpd.GeoDataFrame(
+        geometry=[Point(coord["lng"], coord["lat"]) for coord in missing_coords],
+        crs="EPSG:4326"
+    )
+    df_metric = df.to_crs(epsg=epsg_metric)
+
+    radius = buffer_radius(placeholder_area_m2)
+    df_metric["geometry"] = df_metric["geometry"].buffer(radius)
+
+    df_latlng = df_metric.to_crs("EPSG:4326")
+    return list(df_latlng.geometry)
+
+
+def find_missing_tree_positions(tree_data: list[dict], epsg_metric: int = 32734,
+                                row_eps: float = 2.0,  # meters
+                                tree_spacing: float = 3.0,  # meters
+                                tolerance: float = 1.0  # meters
+                               ) -> dict:
+    treeDataFrame = pd.DataFrame(tree_data)
+    treeAndGeometryDataFrameLatLong = gpd.GeoDataFrame(treeDataFrame, geometry=gpd.points_from_xy(treeDataFrame["lng"], treeDataFrame["lat"]), crs="EPSG:4326")
+    
+    # {RL 27/06/25} This converts the coordinate system from lat/lng (degrees) to a local metric projection (EPSG:32734 = UTM zone 34S), so we can work with distances in meters. This is critical for spacing analysis.
+    treeAndGeometryDataFrameCRS = treeAndGeometryDataFrameLatLong.to_crs(epsg=epsg_metric)
+
+    # Extract projected x/y coords for clustering and processing
+    treeAndGeometryDataFrameCRS["x"] = treeAndGeometryDataFrameCRS.geometry.x
+    treeAndGeometryDataFrameCRS["y"] = treeAndGeometryDataFrameCRS.geometry.y
+    
+    y_min = treeAndGeometryDataFrameCRS["y"].min()
+    y_max = treeAndGeometryDataFrameCRS["y"].max()
+    print(f"Y range (meters): {y_min:.2f} - {y_max:.2f} (span {y_max - y_min:.2f} m)")
+    
+    # Cluster rows based on y coordinate (row pattern is horizontal)
+    db = DBSCAN(eps=row_eps, min_samples=2)
+    treeAndGeometryDataFrameCRS["row"] = db.fit_predict(treeAndGeometryDataFrameCRS[["y"]])
+    
+    num_rows = treeAndGeometryDataFrameCRS["row"].nunique()
+    print(f"Number of detected rows: {num_rows}")
+    
+    missing_coords = []
+    labeled_tree_coords = []
+
+    for row_label in sorted(treeAndGeometryDataFrameCRS["row"].unique()):
+        if row_label == -1:
+            continue  # skip noise
+
+        row_df = treeAndGeometryDataFrameCRS[treeAndGeometryDataFrameCRS["row"] == row_label].sort_values("x")
+        xs = row_df["x"].to_numpy()
+        ys = row_df["y"].to_numpy()
+        latlngs = row_df["geometry"].to_crs(4326)
+
+        if len(xs) < 2:
+            continue
+
+        # Add labeled trees
+        for idx, geom in enumerate(latlngs.geometry):
+            labeled_tree_coords.append({
+                "lat": geom.y,
+                "lng": geom.x,
+                "label": f"{row_label + 1}.{idx + 1}"
+            })
+
+        # Detect missing positions
+        min_x, max_x = xs.min(), xs.max()
+        num_steps = int((max_x - min_x) / tree_spacing)
+        expected_xs = [min_x + i * tree_spacing for i in range(num_steps + 1)]
+
+        for expected_x in expected_xs:
+            if not np.any(np.abs(xs - expected_x) <= tolerance):
+                y_avg = np.mean(ys)
+                missing_pt_metric = Point(expected_x, y_avg)
+                missing_pt_wgs = gpd.GeoSeries([missing_pt_metric], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
+                missing_coords.append({"lat": missing_pt_wgs.y, "lng": missing_pt_wgs.x})
+
+    return {
+        "missing_coords": missing_coords,
+        "labeled_tree_coords": labeled_tree_coords
+    }

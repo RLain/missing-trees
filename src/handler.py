@@ -1,5 +1,5 @@
 from clients.aerobotics_api_client import AeroboticsAPIClient
-from utils.visualisation import create_map
+from utils.visualisation import create_orchard_map
 from utils.spatial import create_missing_tree_polygons, create_tree_polygons, find_missing_tree_positions
 from shapely.geometry import Polygon
 import asyncio
@@ -49,12 +49,17 @@ async def missing_trees(event, context):
     tree_polygons = create_tree_polygons(tree_data)
     tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
     
-    result = find_missing_tree_positions(tree_data)
-    missing_coords = result["missing_coords"]
-    labeled_tree_coords = result["labeled_tree_coords"]
-     
-    gaps = create_missing_tree_polygons(missing_coords)
-    folium_map = create_map(tree_polygons, outer_polygon, labeled_tree_coords, tree_points, missing_coords)
+    results = find_missing_tree_positions(tree_data, outer_polygon)
+
+    # Create visualization
+    folium_map = create_orchard_map(
+        tree_polygons=tree_polygons,
+        outer_polygon=outer_polygon,
+        labeled_points=results["labeled_tree_coords"],
+        tree_points=results["tree_points"],
+        missing_points=results["missing_coords"],
+        matched_trees=results.get("matched_trees", [])
+    )
 
     # Save map to HTML file (you can adjust this path)
     output_path = "/tmp/tree_gaps_map.html"
@@ -63,7 +68,7 @@ async def missing_trees(event, context):
     # Example return: number of trees and gaps found
     return {
         "tree_count": len(tree_polygons),
-        "gap_count": len(gaps),
+        #"gap_count": len(results["missing_coords"].length),
         #"gaps": [gap.wkt for gap in gaps],
     }
 

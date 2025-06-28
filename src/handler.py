@@ -9,14 +9,24 @@ from clients.aerobotics_api_client import AeroboticsAPIClient
 import json
 
 #TODO: Pass into API
-orchard_id="ABCDE"
+orchard_id="216269"
 
 async def missing_trees(event, context):
-    # TODO: Return orchard_id = event.get("orchard_id", "216269")
-    # TODO: If orchard_id does not exist return 404 
+    #TODO: Continue with when focusing on deployment - 404 is working
+    # orchard_id = None
+    # if "pathParameters" in event and event["pathParameters"]:
+    #     orchard_id = event["pathParameters"].get("orchard_id")
+
+    # if not orchard_id:
+    #     return {
+    #         "statusCode": 404,
+    #         "body": '{"error": "orchard_id path parameter is required"}',
+    #         "headers": {
+    #             "Content-Type": "application/json"
+    #         }
+    #     }
 
     client = AeroboticsAPIClient()
-    print("orchard_id", orchard_id)
     try:
         survey = await client.get_survey(orchard_id)
     except ApiError as e:

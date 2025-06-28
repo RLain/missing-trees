@@ -27,7 +27,6 @@ class AeroboticsAPIClient(HttpClient):
             raise ApiError(status=e.status, message=detail, body=e.body)
         else:
             log_elapsed_time_in_ms(start, f"Get survey {orchard_id}")
-            print("survey", orchard_id, survey)
             return survey
     
     async def get_tree_survey(self, survey_id: str) -> Dict[str, Any]:

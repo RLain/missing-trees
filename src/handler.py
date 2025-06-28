@@ -50,7 +50,6 @@ async def missing_trees(event, context):
                 "headers": {"Content-Type": "application/json"},
             }
 
-        outer_polygon = build_outer_polygon_from_survey(survey)
         survey_id = survey["results"][0]["id"]
         
         tree_survey = await client.get_tree_survey(survey_id)
@@ -77,6 +76,7 @@ async def missing_trees(event, context):
         ]
         
         # TODO: Add error handling to end if no tree data is returning
+        outer_polygon = build_outer_polygon_from_survey(survey)
         tree_polygons = create_tree_polygons(tree_data)
         tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
 

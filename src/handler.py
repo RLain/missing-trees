@@ -75,10 +75,9 @@ async def missing_trees(event, context):
             for tree in tree_survey["results"]
         ]
         
-        # TODO: Add error handling to end if no tree data is returning
         outer_polygon = build_outer_polygon_from_survey(survey)
         tree_polygons = create_tree_polygons(tree_data)
-        tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
+        # TODO: Delete? tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
 
         results = find_missing_tree_positions(tree_data, outer_polygon)
 

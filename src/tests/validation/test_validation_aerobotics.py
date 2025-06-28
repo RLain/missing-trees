@@ -1,5 +1,5 @@
 import pytest
-from validation.validation_aerobotics import validate_survey_response, validate_tree_survey_response
+from src.validation.aerobotics import validate_survey_response, validate_tree_survey_response
 
 @pytest.mark.parametrize("survey, expected_result, expected_error", [
     # Missing results

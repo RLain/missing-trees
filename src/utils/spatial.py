@@ -7,11 +7,20 @@ from config import (
     BOTTOM_BUFFER_MULTIPLIER,
     DEFAULT_GEOGRAPHIC_CRS,
     DEFAULT_PROJECTED_CRS,
+    GRID_SPACING_MULTIPLIER,
+    HIGH_CONFIDENCE_DISTANCE_THRESHOLD,
     LEFT_BUFFER_MULTIPLIER,
+    MAX_DISTANCE_MULTIPLIER,
+    MAX_NEARBY_TREES,
+    MIN_DISTANCE_MULTIPLIER,
+    NEARBY_SEARCH_MULTIPLIER,
     NORMAL_BUFFER_MULTIPLIER,
     OVERLAP_THRESHOLD_METRES,
+    TREE_RADIUS_MULTIPLIER,
     TREE_SPACING,
 )
+from validation.spatial import validate_tree_data
+
 
 def build_outer_polygon_from_survey(survey: dict) -> Polygon:
     coords_str = survey["results"][0]["polygon"]
@@ -21,6 +30,7 @@ def build_outer_polygon_from_survey(survey: dict) -> Polygon:
     ]
     assert coords[0] == coords[-1], "Polygon ring must be closed"
     return Polygon(coords)
+
 
 # TODO: Step through and properly understand
 def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
@@ -80,10 +90,7 @@ def create_tree_polygons(
 ) -> list:
     print(f"Total input trees: {len(tree_data)}")
 
-    required_keys = {"lat", "lng", "area"}
-    for tree in tree_data:
-        if not required_keys.issubset(tree):
-            raise ValueError(f"Missing one of {required_keys} in tree data: {tree}")
+    validate_tree_data(tree_data)
 
     tree_data_frame_projected = create_geodataframe_from_tree_data(tree_data)
 
@@ -94,11 +101,9 @@ def create_tree_polygons(
         lambda row: row.geometry.buffer(calculate_buffer_radius(row["area"])), axis=1
     )
 
-    tree_latlng = reproject_geodataframe(
-        tree_data_frame_projected, int(DEFAULT_GEOGRAPHIC_CRS.split(":")[-1])
-    )
+    tree_geographic = tree_data_frame_projected.to_crs(epsg=epsg)
 
-    return list(tree_latlng["geometry"])
+    return list(tree_geographic["geometry"])
 
 
 def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
@@ -108,12 +113,13 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
     minx, miny, maxx, maxy = outer_polygon.bounds
 
     # {RL 28/06/2025} Create buffer zones around existing trees to prevent overlap
-    tree_radius = spacing * 0.4
+    tree_radius = spacing * TREE_RADIUS_MULTIPLIER
+
     existing_tree_buffers = [
         Point(x, y).buffer(tree_radius) for x, y in existing_coords
     ]
 
-    grid_spacing = spacing * 0.75
+    grid_spacing = spacing * GRID_SPACING_MULTIPLIER
 
     x_coords = np.arange(minx, maxx + grid_spacing, grid_spacing)
     y_coords = np.arange(miny, maxy + grid_spacing, grid_spacing)
@@ -131,7 +137,7 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
             # Check if this position overlaps with any existing tree
             overlaps_existing = any(
                 buffer.contains(test_point) for buffer in existing_tree_buffers
-            )  # {RL 28/06/2025} Future performance consideration (GPT raising: This results in O(n) operations for each grid point — very slow when you have thousands of trees.)
+            )  # {RL 28/06/2025} Future performance consideration (GPT raising: This results in O(n) operations for each grid point — very slow when you have thousands of trees. Use STRtree)
             if overlaps_existing:
                 continue
 
@@ -143,11 +149,13 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
             min_distance = np.min(distances_to_existing)
 
             # Position is a candidate if it fits the gap criteria
-            min_threshold = spacing * 0.8
-            max_threshold = spacing * 2.5
+            min_threshold = spacing * MIN_DISTANCE_MULTIPLIER
+            max_threshold = spacing * MAX_DISTANCE_MULTIPLIER
 
             if min_threshold < min_distance < max_threshold:
-                nearby_trees = np.sum(distances_to_existing < spacing * 1.5)
+                nearby_trees = np.sum(
+                    distances_to_existing < spacing * NEARBY_SEARCH_MULTIPLIER
+                )
 
                 if nearby_trees < 4:
                     potential_positions.append(
@@ -179,7 +187,9 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
             test_buffer = pos["geometry"].buffer(final_check_radius)
 
             no_final_overlap = not any(
-                test_buffer.intersects(Point(x, y).buffer(spacing * 0.4 * 0.5))
+                test_buffer.intersects(
+                    Point(x, y).buffer(spacing * TREE_RADIUS_MULTIPLIER * 0.5)
+                )
                 for x, y in existing_coords
             )
 
@@ -195,7 +205,7 @@ def find_missing_tree_positions(
     epsg: int = DEFAULT_PROJECTED_CRS,
     tree_spacing: float = TREE_SPACING,
 ) -> dict:
-    tree_data_frame_projected = create_geodataframe_from_tree_data(tree_data)
+    tree_gdf = create_geodataframe_from_tree_data(tree_data, to_projected_crs=True)
     outer_polygon_projected = (
         gpd.GeoSeries([outer_polygon], crs=DEFAULT_GEOGRAPHIC_CRS)
         .to_crs(epsg=epsg)
@@ -203,19 +213,18 @@ def find_missing_tree_positions(
     )
 
     missing_positions = find_gaps_in_orchard(
-        tree_data_frame_projected, outer_polygon_projected, tree_spacing
+        tree_gdf, outer_polygon_projected, tree_spacing
     )
-
-    print(f"Found {len(missing_positions)} potential missing tree positions")
-
-    return format_results(tree_data_frame_projected, missing_positions, epsg)
+    return format_results(tree_gdf, missing_positions, epsg)
 
 
 def format_results(existing_trees, missing_positions, epsg_metric):
     existing_coords = []
     for idx, tree in existing_trees.iterrows():
         point_wgs = (
-            gpd.GeoSeries([tree.geometry], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
+            gpd.GeoSeries([tree.geometry], crs=epsg_metric)
+            .to_crs(DEFAULT_GEOGRAPHIC_CRS)
+            .iloc[0]
         )
         existing_coords.append({"lat": point_wgs.y, "lng": point_wgs.x, "id": idx})
 
@@ -224,26 +233,29 @@ def format_results(existing_trees, missing_positions, epsg_metric):
     for pos in missing_positions:
         point_wgs = (
             gpd.GeoSeries([pos["geometry"]], crs=epsg_metric)
-            .to_crs("EPSG:4326")
+            .to_crs(DEFAULT_GEOGRAPHIC_CRS)
             .iloc[0]
         )
 
         distance = pos["distance_to_nearest"]
         nearby_count = pos.get("nearby_tree_count", 0)
 
-        if distance > 4.5 and nearby_count <= 3:
+        if (
+            distance > HIGH_CONFIDENCE_DISTANCE_THRESHOLD
+            and nearby_count < MAX_NEARBY_TREES
+        ):
             confidence = "high"
         else:
             continue
 
         missing_coords.append(
             {
-                "lat": point_wgs.y,
-                "lng": point_wgs.x,
                 "confidence": confidence,
                 "distance_to_nearest": round(distance, 1),
+                "lat": point_wgs.y,
+                "lng": point_wgs.x,
                 "nearby_tree_count": nearby_count,
-                "x": pos["x"],  # Keep projected coords for clustering
+                "x": pos["x"],
                 "y": pos["y"],
             }
         )
@@ -289,13 +301,12 @@ def format_results(existing_trees, missing_positions, epsg_metric):
                 "lat": np.mean([c["lat"] for c in cluster]),
                 "lng": np.mean([c["lng"] for c in cluster]),
                 "merged_from": len(cluster),
-                "nearby_tree_count": min(c["nearby_tree_count"] for c in cluster),
             }
 
         clustered_coords.append(final_coord)
 
     print(f"Identified {len(clustered_coords)} missing trees")
-    
+
     return {
         "missing_coords": clustered_coords,
         "existing_tree_coords": existing_coords,
@@ -337,6 +348,3 @@ def inner_boundary_visualisation(outer_polygon):
         .to_crs(DEFAULT_GEOGRAPHIC_CRS)
         .iloc[0]
     )
-
-def reproject_geodataframe(gdf: gpd.GeoDataFrame, epsg: int) -> gpd.GeoDataFrame:
-    return gdf.to_crs(epsg=epsg)

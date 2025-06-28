@@ -1,5 +1,6 @@
 from clients.aerobotics_api_client import AeroboticsAPIClient
-from validation.validation_aerobotics import (
+from utils.helpers import convert_result_to_analysis, orchard_result_to_dict
+from validation.aerobotics import (
     validate_survey_response,
     validate_tree_survey_response,
 )
@@ -88,7 +89,9 @@ async def missing_trees(event, context):
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
 
-        return results["missing_coords"]
+        result_to_analysis = convert_result_to_analysis(results)
+        
+        return orchard_result_to_dict(result_to_analysis)
 
     except ApiError as e:
         return {

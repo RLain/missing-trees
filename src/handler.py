@@ -7,9 +7,9 @@ from utils.api_error import ApiError
 from utils.visualisation import create_orchard_map
 from utils.spatial import (
     build_outer_polygon_from_survey,
-    create_missing_tree_polygons,
     create_tree_polygons,
     find_missing_tree_positions,
+    inner_boundary_visualisation,
 )
 import asyncio
 from clients.aerobotics_api_client import AeroboticsAPIClient
@@ -76,10 +76,10 @@ async def missing_trees(event, context):
         ]
         
         outer_polygon = build_outer_polygon_from_survey(survey)
+        results = find_missing_tree_positions(tree_data, outer_polygon)
+        inner_boundary_geographic = inner_boundary_visualisation(outer_polygon)
         tree_polygons = create_tree_polygons(tree_data)
         # TODO: Delete? tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
-
-        results = find_missing_tree_positions(tree_data, outer_polygon)
 
         print("results", results)
 
@@ -87,6 +87,7 @@ async def missing_trees(event, context):
         folium_map = create_orchard_map(
             tree_polygons=tree_polygons,
             outer_polygon=outer_polygon,
+            inner_boundary=inner_boundary_geographic,
             tree_points=results["existing_tree_coords"],
             missing_points=results["missing_coords"],
         )

@@ -7,6 +7,7 @@ from typing import List, Dict, Optional, Union
 def create_orchard_map(
     tree_polygons: List,
     outer_polygon,
+    inner_boundary,
     # labeled_points: Optional[List[Dict]] = None,
     tree_points: Optional[List[Union[Point, tuple]]] = None,
     missing_points: Optional[List[Dict]] = None,
@@ -28,6 +29,19 @@ def create_orchard_map(
         name="Orchard Boundary",
         style_function=lambda x: {
             "color": "blue",
+            "fill": False,
+            "weight": 3,
+            "opacity": 0.8,
+        },
+    ).add_to(folium_map)
+    
+    
+    # Inner polygon boundary
+    folium.GeoJson(
+        inner_boundary,
+        name="Inner Boundary",
+        style_function=lambda x: {
+            "color": "pink",
             "fill": False,
             "weight": 3,
             "opacity": 0.8,

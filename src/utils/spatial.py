@@ -9,7 +9,7 @@ import numpy as np
 from collections import defaultdict
 from scipy.spatial.distance import pdist
 from scipy.spatial import Voronoi
-from config import DEFAULT_GEOGRAPHIC_CRS, DEFAULT_PROJECTED_CRS
+from config import BOTTOM_BUFFER_MULTIPLIER, DEFAULT_GEOGRAPHIC_CRS, DEFAULT_PROJECTED_CRS, LEFT_BUFFER_MULTIPLIER, NORMAL_BUFFER_MULTIPLIER, TREE_SPACING
 
 def build_outer_polygon_from_survey(survey: dict) -> Polygon:
     coords_str = survey["results"][0]["polygon"]
@@ -17,23 +17,67 @@ def build_outer_polygon_from_survey(survey: dict) -> Polygon:
     assert coords[0] == coords[-1], "Polygon ring must be closed"
     return Polygon(coords)
 
-def create_geodataframe_from_tree_data(tree_data: list[dict], crs: str = DEFAULT_GEOGRAPHIC_CRS) -> gpd.GeoDataFrame:
-    # {RL 28/06/2025} CRS conversion is required to calculate the buffer radius. Input data is in EPSG:4326 (WGS84), which uses degrees for lat/lng and needs converting to EPSG:32734, which uses meters.
+#TODO: Step through and properly understand
+def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
+    minx, miny, maxx, maxy = polygon.bounds
+    width, height = maxx - minx, maxy - miny
+    htol, vtol = width * 0.1, height * 0.1
+    cx, cy = minx + width / 2, miny + height / 2
+
+    def move_point(x, y):
+        is_bottom = y <= (miny + vtol)
+        is_left = x <= (minx + htol)
+
+        if is_bottom and is_left:
+            return (x + left_buffer, y + bottom_buffer)
+        elif is_bottom:
+            return (x, y + bottom_buffer)
+        elif is_left:
+            return (x + left_buffer, y)
+        else:
+            dx, dy = cx - x, cy - y
+            dist = np.hypot(dx, dy)
+            if dist == 0:
+                return (x, y)
+            return (x + (dx / dist) * normal_buffer,
+                    y + (dy / dist) * normal_buffer)
+
+    coords = polygon.exterior.coords[:-1]
+    buffered_coords = [move_point(x, y) for x, y in coords]
+    buffered_coords.append(buffered_coords[0])
+
+    try:
+        return Polygon(buffered_coords)
+    except:
+        print("Custom buffer failed: Falling back to normal buffer")
+        return polygon.buffer(-normal_buffer)
+
+def create_geodataframe_from_tree_data(
+    tree_data: list[dict],
+    to_projected_crs: bool = True,
+    crs: str = DEFAULT_GEOGRAPHIC_CRS,
+    projected_crs: int = DEFAULT_PROJECTED_CRS
+) -> gpd.GeoDataFrame:
     tree_data_frame = pd.DataFrame(tree_data)
-    return gpd.GeoDataFrame(
+    gdf = gpd.GeoDataFrame(
         tree_data_frame,
         geometry=gpd.points_from_xy(tree_data_frame["lng"], tree_data_frame["lat"]),
         crs=crs,
     )
+    # {RL 28/06/2025} CRS conversion is required to calculate the metric distance. Input data is in EPSG:4326 (WGS84), which uses degrees for lat/lng and needs converting to EPSG:32734, which uses meters.
+    if to_projected_crs:
+        return gdf.to_crs(epsg=projected_crs)
+    return gdf
 
 def create_tree_polygons(tree_data: list[dict], epsg: int = DEFAULT_PROJECTED_CRS) -> list:
+    print(f"Total input trees: {len(tree_data)}")
+
     required_keys = {"lat", "lng", "area"}
     for tree in tree_data:
         if not required_keys.issubset(tree):
             raise ValueError(f"Missing one of {required_keys} in tree data: {tree}")
         
-    tree_data_frame_geo = create_geodataframe_from_tree_data(tree_data)
-    tree_data_frame_projected = tree_data_frame_geo.to_crs(epsg=epsg)
+    tree_data_frame_projected = create_geodataframe_from_tree_data(tree_data)
 
     def calculate_buffer_radius(area):
         return math.sqrt(area / math.pi)
@@ -43,29 +87,29 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = DEFAULT_PROJECTED_CR
     )
 
     tree_latlng = reproject_geodataframe(tree_data_frame_projected, int(DEFAULT_GEOGRAPHIC_CRS.split(":")[-1]))
-
+    
     return list(tree_latlng["geometry"])
 
-def create_missing_tree_polygons(
-    missing_coords: list[dict],
-    placeholder_area_m2: float = 1.0,
-    epsg_metric: int = 32734,
-) -> list:
-    def buffer_radius(area):
-        return math.sqrt(area / math.pi)
+# def create_missing_tree_polygons(
+#     missing_coords: list[dict],
+#     placeholder_area_m2: float = 1.0,
+#     epsg_metric: int = 32734,
+# ) -> list:
+#     def buffer_radius(area):
+#         return math.sqrt(area / math.pi)
 
-    # Create Point geometries from dicts: Point(longitude, latitude)
-    df = gpd.GeoDataFrame(
-        geometry=[Point(coord["lng"], coord["lat"]) for coord in missing_coords],
-        crs="EPSG:4326",
-    )
-    df_metric = df.to_crs(epsg=epsg_metric)
+#     # Create Point geometries from dicts: Point(longitude, latitude)
+#     df = gpd.GeoDataFrame(
+#         geometry=[Point(coord["lng"], coord["lat"]) for coord in missing_coords],
+#         crs="EPSG:4326",
+#     )
+#     df_metric = df.to_crs(epsg=epsg_metric)
 
-    radius = buffer_radius(placeholder_area_m2)
-    df_metric["geometry"] = df_metric["geometry"].buffer(radius)
+#     radius = buffer_radius(placeholder_area_m2)
+#     df_metric["geometry"] = df_metric["geometry"].buffer(radius)
 
-    df_latlng = df_metric.to_crs("EPSG:4326")
-    return list(df_latlng.geometry)
+#     df_latlng = df_metric.to_crs("EPSG:4326")
+#     return list(df_latlng.geometry)
 
 def cluster_overlapping_positions(positions, spacing):
     """
@@ -161,90 +205,30 @@ def cluster_overlapping_positions(positions, spacing):
 
 def find_missing_tree_positions(tree_data: list[dict], 
                                 outer_polygon,
-                                epsg_metric: int = DEFAULT_PROJECTED_CRS,
-                                tree_spacing: float = 4.0) -> dict:
-    
-    tree_data_frame = pd.DataFrame(tree_data)
+                                epsg: int = DEFAULT_PROJECTED_CRS,
+                                tree_spacing: float = TREE_SPACING) -> dict:
+    tree_data_frame_projected = create_geodataframe_from_tree_data(tree_data)
+    outer_polygon_projected = gpd.GeoSeries([outer_polygon], crs=DEFAULT_GEOGRAPHIC_CRS).to_crs(epsg=epsg).iloc[0]
 
-    # {RL 28/06/2025} CRS conversion is required to calculate the buffer radius. Input data is in EPSG:4326 (WGS84), which uses degrees for lat/lng and needs converting to EPSG:32734, which uses meters.
-    tree_data_frame_crs = gpd.GeoDataFrame(
-        tree_data_frame, geometry=gpd.points_from_xy(tree_data_frame["lng"], tree_data_frame["lat"]), crs=DEFAULT_GEOGRAPHIC_CRS
-    )
-    
-    print(f"Total input trees: {len(tree_data_frame_crs)}")
-    
-    tree_gdf_proj = tree_data_frame_crs.to_crs(epsg=epsg_metric)
-    outer_proj = gpd.GeoSeries([outer_polygon], crs="EPSG:4326").to_crs(epsg=epsg_metric).iloc[0]
-    
-    missing_positions = find_gaps_in_orchard(tree_gdf_proj, outer_proj, tree_spacing)
+    missing_positions = find_gaps_in_orchard(tree_data_frame_projected, outer_polygon_projected, tree_spacing)
     
     print(f"Found {len(missing_positions)} potential missing tree positions")
-    
-    return format_results(tree_gdf_proj, missing_positions, epsg_metric)
 
-def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
-    """Create a custom inward buffer with larger buffers on bottom and left edges"""
-    minx, miny, maxx, maxy = polygon.bounds
+    return format_results(tree_data_frame_projected, missing_positions, epsg)
     
-    # Get exterior coordinates
-    exterior_coords = list(polygon.exterior.coords)
-    buffered_coords = []
-    
-    # Calculate tolerances for edge detection
-    width = maxx - minx
-    height = maxy - miny
-    horizontal_tolerance = width * 0.1   # 10% of width
-    vertical_tolerance = height * 0.1    # 10% of height
-    
-    for i, (x, y) in enumerate(exterior_coords[:-1]):  # Skip last point (duplicate of first)
-        # Determine which edge this point belongs to
-        is_bottom = y <= (miny + vertical_tolerance)
-        is_left = x <= (minx + horizontal_tolerance)
-        is_top = y >= (maxy - vertical_tolerance)
-        is_right = x >= (maxx - horizontal_tolerance)
-        
-        # Calculate inward movement based on edge
-        if is_bottom and is_left:
-            # Corner: apply both buffers
-            buffered_coords.append((x + left_buffer, y + bottom_buffer))
-        elif is_bottom:
-            # Bottom edge: move up
-            buffered_coords.append((x, y + bottom_buffer))
-        elif is_left:
-            # Left edge: move right
-            buffered_coords.append((x + left_buffer, y))
-        else:
-            # Top or right edges: use normal buffer toward center
-            center_x = minx + width / 2
-            center_y = miny + height / 2
-            
-            # Move toward center by normal_buffer distance
-            to_center_x = center_x - x
-            to_center_y = center_y - y
-            distance = np.sqrt(to_center_x**2 + to_center_y**2)
-            
-            if distance > 0:
-                norm_x = to_center_x / distance
-                norm_y = to_center_y / distance
-                buffered_coords.append((x + norm_x * normal_buffer, y + norm_y * normal_buffer))
-            else:
-                buffered_coords.append((x, y))
-    
-    # Close the polygon
-    buffered_coords.append(buffered_coords[0])
-    
-    try:
-        return Polygon(buffered_coords)
-    except:
-        # Fallback to simple buffer if custom buffer fails
-        return polygon.buffer(-normal_buffer)
-    
-def find_gaps_in_orchard(existing_trees, outer_polygon, spacing=4.0):    
+def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):    
+    print("find_gaps_in_orchard: existing_trees", existing_trees.geom_type.value_counts())
+    print("existing_trees", existing_trees.head(1)) 
+    # existing_trees          lat        lng    area                        geometry
+    #0 -32.327964  18.826872  22.667  POINT (295449.295 6421135.967)
+
     existing_coords = [(pt.x, pt.y) for pt in existing_trees.geometry]
+    print("existing_coords", existing_coords[0])  # existing_coords (295449.2948185066, 6421135.967011399)
+
     existing_points = np.array(existing_coords)
     minx, miny, maxx, maxy = outer_polygon.bounds
     
-    # Create buffer zones around existing trees to prevent overlap
+    # {RL 28/06/2025} Create buffer zones around existing trees to prevent overlap
     tree_radius = spacing * 0.4
     existing_tree_buffers = [Point(x, y).buffer(tree_radius) for x, y in existing_coords]
     
@@ -264,7 +248,7 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing=4.0):
                 continue
             
             # Check if this position overlaps with any existing tree
-            overlaps_existing = any(buffer.contains(test_point) for buffer in existing_tree_buffers)
+            overlaps_existing = any(buffer.contains(test_point) for buffer in existing_tree_buffers)  #{RL 28/06/2025} Future performance consideration (GPT raising: This results in O(n) operations for each grid point — very slow when you have thousands of trees.)
             if overlaps_existing:
                 continue
                 
@@ -290,10 +274,10 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing=4.0):
                         'nearby_tree_count': nearby_trees
                     })
     
-    # Apply custom buffer filtering
-    normal_buffer_distance = spacing * 2
-    bottom_buffer_distance = spacing * 3.5
-    left_buffer_distance = spacing * 3.0
+    # {RL 28/06/2025} ⚠️: This is not robust....wrangling the outer permimeter based on visual intel.
+    normal_buffer_distance = spacing * NORMAL_BUFFER_MULTIPLIER
+    bottom_buffer_distance = spacing * BOTTOM_BUFFER_MULTIPLIER
+    left_buffer_distance = spacing * LEFT_BUFFER_MULTIPLIER
     
     inner_boundary = create_custom_buffer(outer_polygon, normal_buffer_distance, 
                                         bottom_buffer_distance, left_buffer_distance)
@@ -311,6 +295,8 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing=4.0):
             
             if no_final_overlap:
                 filtered_positions.append(pos)
+                
+    print("sample of filtered_positions", filtered_positions[0])
     
     # Apply clustering rules: merge overlapping positions
     clustered_positions = cluster_overlapping_positions(filtered_positions, spacing)
@@ -476,6 +462,18 @@ def format_results(existing_trees, missing_positions, epsg_metric):
             "individual_results": len([m for m in clustered_coords if m.get("merged_from", 1) == 1])
         }
     }
+
+def inner_boundary_visualisation(outer_polygon):
+    normal_buffer_distance = TREE_SPACING * NORMAL_BUFFER_MULTIPLIER
+    bottom_buffer_distance = TREE_SPACING * BOTTOM_BUFFER_MULTIPLIER
+    left_buffer_distance = TREE_SPACING * LEFT_BUFFER_MULTIPLIER
+    
+    outer_polygon_projected = gpd.GeoSeries([outer_polygon], crs=DEFAULT_GEOGRAPHIC_CRS).to_crs(epsg=DEFAULT_PROJECTED_CRS).iloc[0]
+    inner_boundary = create_custom_buffer(outer_polygon_projected, normal_buffer_distance, 
+                                    bottom_buffer_distance, left_buffer_distance)
+    
+    return gpd.GeoSeries([inner_boundary], crs=DEFAULT_PROJECTED_CRS).to_crs(DEFAULT_GEOGRAPHIC_CRS).iloc[0]
+        
 
 def reproject_geodataframe(gdf: gpd.GeoDataFrame, epsg: int) -> gpd.GeoDataFrame:
     return gdf.to_crs(epsg=epsg)

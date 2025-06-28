@@ -1,11 +1,4 @@
 def validate_survey_response(survey: dict) -> tuple[bool, str | None]:
-    """
-    Validates the survey response dictionary.
-
-    Returns:
-        (True, None) if valid.
-        (False, error_message) if invalid.
-    """
     results = survey.get("results")
     if not results or not isinstance(results, list) or len(results) == 0:
         return False, "No survey results found"

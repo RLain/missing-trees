@@ -30,9 +30,6 @@ async def missing_trees(event, context):
     try:
         survey = await client.get_survey(orchard_id)
         
-        if "results" in survey and survey["results"]:
-            survey["results"][0].pop("polygon", None)
-        
         valid, error_msg = validate_survey_response(survey)
         if not valid:
             return {

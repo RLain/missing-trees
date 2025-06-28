@@ -111,97 +111,97 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = DEFAULT_PROJECTED_CR
 #     df_latlng = df_metric.to_crs("EPSG:4326")
 #     return list(df_latlng.geometry)
 
-def cluster_overlapping_positions(positions, spacing):
-    """
-    Merge overlapping missing positions into centralized points
-    Rules:
-    1. If a missing tree is not touching another missing tree, continue to flag as missing tree
-    2. If missing trees are overlapping, combine them and return the centralized point
-    """
-    if not positions:
-        return positions
+# def cluster_overlapping_positions(positions, spacing):
+#     """
+#     Merge overlapping missing positions into centralized points
+#     Rules:
+#     1. If a missing tree is not touching another missing tree, continue to flag as missing tree
+#     2. If missing trees are overlapping, combine them and return the centralized point
+#     """
+#     if not positions:
+#         return positions
     
-    # Define overlap threshold - positions closer than this will be merged
-    overlap_threshold = spacing * 0.6
+#     # Define overlap threshold - positions closer than this will be merged
+#     overlap_threshold = spacing * 0.6
     
-    print(f"\n=== CLUSTERING DEBUG ===")
-    print(f"Input positions: {len(positions)}")
-    print(f"Overlap threshold: {overlap_threshold:.2f}m")
+#     print(f"\n=== CLUSTERING DEBUG ===")
+#     print(f"Input positions: {len(positions)}")
+#     print(f"Overlap threshold: {overlap_threshold:.2f}m")
     
-    # First, let's check all pairwise distances to see what should be clustered
-    print(f"\nPairwise distances:")
-    for i in range(len(positions)):
-        for j in range(i + 1, len(positions)):
-            dist = np.sqrt((positions[i]['x'] - positions[j]['x'])**2 + 
-                          (positions[i]['y'] - positions[j]['y'])**2)
-            should_cluster = "YES" if dist <= overlap_threshold else "NO"
+#     # First, let's check all pairwise distances to see what should be clustered
+#     print(f"\nPairwise distances:")
+#     for i in range(len(positions)):
+#         for j in range(i + 1, len(positions)):
+#             dist = np.sqrt((positions[i]['x'] - positions[j]['x'])**2 + 
+#                           (positions[i]['y'] - positions[j]['y'])**2)
+#             should_cluster = "YES" if dist <= overlap_threshold else "NO"
     
-    clustered = []
-    processed = set()
+#     clustered = []
+#     processed = set()
     
-    for i, current_pos in enumerate(positions):
-        if i in processed:
-            continue
+#     for i, current_pos in enumerate(positions):
+#         if i in processed:
+#             continue
                     
-        # Start a new cluster with current position
-        cluster = [current_pos]
-        cluster_indices = {i}
+#         # Start a new cluster with current position
+#         cluster = [current_pos]
+#         cluster_indices = {i}
         
-        # Find all positions that overlap with positions in current cluster
-        # Use a queue to handle transitive overlaps (A overlaps B, B overlaps C)
-        queue = [i]
+#         # Find all positions that overlap with positions in current cluster
+#         # Use a queue to handle transitive overlaps (A overlaps B, B overlaps C)
+#         queue = [i]
         
-        while queue:
-            current_idx = queue.pop(0)
-            current_position = positions[current_idx]
+#         while queue:
+#             current_idx = queue.pop(0)
+#             current_position = positions[current_idx]
                         
-            # Check all remaining unprocessed positions
-            for j, other_pos in enumerate(positions):
-                if j in cluster_indices or j in processed:
-                    continue
+#             # Check all remaining unprocessed positions
+#             for j, other_pos in enumerate(positions):
+#                 if j in cluster_indices or j in processed:
+#                     continue
                     
-                # Calculate distance between current position and other position
-                distance = np.sqrt((current_position['x'] - other_pos['x'])**2 + 
-                                 (current_position['y'] - other_pos['y'])**2)
+#                 # Calculate distance between current position and other position
+#                 distance = np.sqrt((current_position['x'] - other_pos['x'])**2 + 
+#                                  (current_position['y'] - other_pos['y'])**2)
                                 
-                # If positions overlap, add to cluster
-                if distance <= overlap_threshold:
-                    print(f"    -> Adding position {j} to cluster (distance {distance:.2f} <= {overlap_threshold:.2f})")
-                    cluster.append(other_pos)
-                    cluster_indices.add(j)
-                    queue.append(j)  # Check this new position for more overlaps
+#                 # If positions overlap, add to cluster
+#                 if distance <= overlap_threshold:
+#                     print(f"    -> Adding position {j} to cluster (distance {distance:.2f} <= {overlap_threshold:.2f})")
+#                     cluster.append(other_pos)
+#                     cluster_indices.add(j)
+#                     queue.append(j)  # Check this new position for more overlaps
         
-        # Mark all positions in this cluster as processed
-        processed.update(cluster_indices)
+#         # Mark all positions in this cluster as processed
+#         processed.update(cluster_indices)
         
-        # Process the cluster according to rules
-        if len(cluster) == 1:
-            # Rule 1: Single position (not touching others), keep as is
-            clustered.append(current_pos)
-        else:
-            # Rule 2: Multiple overlapping positions, create centralized point
-            center_x = np.mean([p['x'] for p in cluster])
-            center_y = np.mean([p['y'] for p in cluster])
+#         # Process the cluster according to rules
+#         if len(cluster) == 1:
+#             # Rule 1: Single position (not touching others), keep as is
+#             clustered.append(current_pos)
+#         else:
+#             # Rule 2: Multiple overlapping positions, create centralized point
+#             center_x = np.mean([p['x'] for p in cluster])
+#             center_y = np.mean([p['y'] for p in cluster])
             
-            print(f"  -> Creating centralized point at ({center_x:.1f}, {center_y:.1f})")
+#             print(f"  -> Creating centralized point at ({center_x:.1f}, {center_y:.1f})")
             
-            # Use best metrics from the cluster
-            best_distance = min(p['distance_to_nearest'] for p in cluster)
-            min_nearby_count = min(p['nearby_tree_count'] for p in cluster)
+#             # Use best metrics from the cluster
+#             best_distance = min(p['distance_to_nearest'] for p in cluster)
+#             min_nearby_count = min(p['nearby_tree_count'] for p in cluster)
             
-            # Create centralized position
-            clustered_position = {
-                'geometry': Point(center_x, center_y),
-                'x': center_x,
-                'y': center_y,
-                'distance_to_nearest': best_distance,
-                'nearby_tree_count': min_nearby_count,
-                'cluster_size': len(cluster)
-            }
+#             # Create centralized position
+#             clustered_position = {
+#                 'geometry': Point(center_x, center_y),
+#                 'x': center_x,
+#                 'y': center_y,
+#                 'distance_to_nearest': best_distance,
+#                 'nearby_tree_count': min_nearby_count,
+#                 'cluster_size': len(cluster)
+#             }
             
-            clustered.append(clustered_position)
+#             clustered.append(clustered_position)
     
-    return clustered
+#     return clustered
 
 def find_missing_tree_positions(tree_data: list[dict], 
                                 outer_polygon,
@@ -217,13 +217,7 @@ def find_missing_tree_positions(tree_data: list[dict],
     return format_results(tree_data_frame_projected, missing_positions, epsg)
     
 def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):    
-    print("find_gaps_in_orchard: existing_trees", existing_trees.geom_type.value_counts())
-    print("existing_trees", existing_trees.head(1)) 
-    # existing_trees          lat        lng    area                        geometry
-    #0 -32.327964  18.826872  22.667  POINT (295449.295 6421135.967)
-
     existing_coords = [(pt.x, pt.y) for pt in existing_trees.geometry]
-    print("existing_coords", existing_coords[0])  # existing_coords (295449.2948185066, 6421135.967011399)
 
     existing_points = np.array(existing_coords)
     minx, miny, maxx, maxy = outer_polygon.bounds
@@ -274,7 +268,7 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
                         'nearby_tree_count': nearby_trees
                     })
     
-    # {RL 28/06/2025} ⚠️: This is not robust....wrangling the outer permimeter based on visual intel.
+    # {RL 28/06/2025} ⚠️: This is not robust....wrangling the outer permimeter based on visual intel. See Known Issues I1.
     normal_buffer_distance = spacing * NORMAL_BUFFER_MULTIPLIER
     bottom_buffer_distance = spacing * BOTTOM_BUFFER_MULTIPLIER
     left_buffer_distance = spacing * LEFT_BUFFER_MULTIPLIER
@@ -296,12 +290,7 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
             if no_final_overlap:
                 filtered_positions.append(pos)
                 
-    print("sample of filtered_positions", filtered_positions[0])
-    
-    # Apply clustering rules: merge overlapping positions
-    clustered_positions = cluster_overlapping_positions(filtered_positions, spacing)
-    
-    return clustered_positions
+    return filtered_positions
 
 def format_results(existing_trees, missing_positions, epsg_metric):    
     # Convert existing trees back to WGS84

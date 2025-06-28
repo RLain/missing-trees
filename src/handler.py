@@ -81,8 +81,6 @@ async def missing_trees(event, context):
         tree_polygons = create_tree_polygons(tree_data)
         # TODO: Delete? tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
 
-        print("results", results)
-
         # Create visualization
         folium_map = create_orchard_map(
             tree_polygons=tree_polygons,

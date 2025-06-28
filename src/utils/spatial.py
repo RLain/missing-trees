@@ -9,7 +9,7 @@ import numpy as np
 from collections import defaultdict
 from scipy.spatial.distance import pdist
 from scipy.spatial import Voronoi
-from config import BOTTOM_BUFFER_MULTIPLIER, DEFAULT_GEOGRAPHIC_CRS, DEFAULT_PROJECTED_CRS, LEFT_BUFFER_MULTIPLIER, NORMAL_BUFFER_MULTIPLIER, TREE_SPACING
+from config import BOTTOM_BUFFER_MULTIPLIER, DEFAULT_GEOGRAPHIC_CRS, DEFAULT_PROJECTED_CRS, LEFT_BUFFER_MULTIPLIER, NORMAL_BUFFER_MULTIPLIER, OVERLAP_THRESHOLD_METRES, TREE_SPACING
 
 def build_outer_polygon_from_survey(survey: dict) -> Polygon:
     coords_str = survey["results"][0]["polygon"]
@@ -89,119 +89,6 @@ def create_tree_polygons(tree_data: list[dict], epsg: int = DEFAULT_PROJECTED_CR
     tree_latlng = reproject_geodataframe(tree_data_frame_projected, int(DEFAULT_GEOGRAPHIC_CRS.split(":")[-1]))
     
     return list(tree_latlng["geometry"])
-
-# def create_missing_tree_polygons(
-#     missing_coords: list[dict],
-#     placeholder_area_m2: float = 1.0,
-#     epsg_metric: int = 32734,
-# ) -> list:
-#     def buffer_radius(area):
-#         return math.sqrt(area / math.pi)
-
-#     # Create Point geometries from dicts: Point(longitude, latitude)
-#     df = gpd.GeoDataFrame(
-#         geometry=[Point(coord["lng"], coord["lat"]) for coord in missing_coords],
-#         crs="EPSG:4326",
-#     )
-#     df_metric = df.to_crs(epsg=epsg_metric)
-
-#     radius = buffer_radius(placeholder_area_m2)
-#     df_metric["geometry"] = df_metric["geometry"].buffer(radius)
-
-#     df_latlng = df_metric.to_crs("EPSG:4326")
-#     return list(df_latlng.geometry)
-
-# def cluster_overlapping_positions(positions, spacing):
-#     """
-#     Merge overlapping missing positions into centralized points
-#     Rules:
-#     1. If a missing tree is not touching another missing tree, continue to flag as missing tree
-#     2. If missing trees are overlapping, combine them and return the centralized point
-#     """
-#     if not positions:
-#         return positions
-    
-#     # Define overlap threshold - positions closer than this will be merged
-#     overlap_threshold = spacing * 0.6
-    
-#     print(f"\n=== CLUSTERING DEBUG ===")
-#     print(f"Input positions: {len(positions)}")
-#     print(f"Overlap threshold: {overlap_threshold:.2f}m")
-    
-#     # First, let's check all pairwise distances to see what should be clustered
-#     print(f"\nPairwise distances:")
-#     for i in range(len(positions)):
-#         for j in range(i + 1, len(positions)):
-#             dist = np.sqrt((positions[i]['x'] - positions[j]['x'])**2 + 
-#                           (positions[i]['y'] - positions[j]['y'])**2)
-#             should_cluster = "YES" if dist <= overlap_threshold else "NO"
-    
-#     clustered = []
-#     processed = set()
-    
-#     for i, current_pos in enumerate(positions):
-#         if i in processed:
-#             continue
-                    
-#         # Start a new cluster with current position
-#         cluster = [current_pos]
-#         cluster_indices = {i}
-        
-#         # Find all positions that overlap with positions in current cluster
-#         # Use a queue to handle transitive overlaps (A overlaps B, B overlaps C)
-#         queue = [i]
-        
-#         while queue:
-#             current_idx = queue.pop(0)
-#             current_position = positions[current_idx]
-                        
-#             # Check all remaining unprocessed positions
-#             for j, other_pos in enumerate(positions):
-#                 if j in cluster_indices or j in processed:
-#                     continue
-                    
-#                 # Calculate distance between current position and other position
-#                 distance = np.sqrt((current_position['x'] - other_pos['x'])**2 + 
-#                                  (current_position['y'] - other_pos['y'])**2)
-                                
-#                 # If positions overlap, add to cluster
-#                 if distance <= overlap_threshold:
-#                     print(f"    -> Adding position {j} to cluster (distance {distance:.2f} <= {overlap_threshold:.2f})")
-#                     cluster.append(other_pos)
-#                     cluster_indices.add(j)
-#                     queue.append(j)  # Check this new position for more overlaps
-        
-#         # Mark all positions in this cluster as processed
-#         processed.update(cluster_indices)
-        
-#         # Process the cluster according to rules
-#         if len(cluster) == 1:
-#             # Rule 1: Single position (not touching others), keep as is
-#             clustered.append(current_pos)
-#         else:
-#             # Rule 2: Multiple overlapping positions, create centralized point
-#             center_x = np.mean([p['x'] for p in cluster])
-#             center_y = np.mean([p['y'] for p in cluster])
-            
-#             print(f"  -> Creating centralized point at ({center_x:.1f}, {center_y:.1f})")
-            
-#             # Use best metrics from the cluster
-#             best_distance = min(p['distance_to_nearest'] for p in cluster)
-#             min_nearby_count = min(p['nearby_tree_count'] for p in cluster)
-            
-#             # Create centralized position
-#             clustered_position = {
-#                 'geometry': Point(center_x, center_y),
-#                 'x': center_x,
-#                 'y': center_y,
-#                 'distance_to_nearest': best_distance,
-#                 'nearby_tree_count': min_nearby_count,
-#                 'cluster_size': len(cluster)
-#             }
-            
-#             clustered.append(clustered_position)
-    
-#     return clustered
 
 def find_missing_tree_positions(tree_data: list[dict], 
                                 outer_polygon,
@@ -293,7 +180,6 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
     return filtered_positions
 
 def format_results(existing_trees, missing_positions, epsg_metric):    
-    # Convert existing trees back to WGS84
     existing_coords = []
     for idx, tree in existing_trees.iterrows():
         point_wgs = gpd.GeoSeries([tree.geometry], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
@@ -303,152 +189,77 @@ def format_results(existing_trees, missing_positions, epsg_metric):
             "id": idx
         })
     
-    # First, convert all missing positions to WGS84 and create initial missing_coords
-    initial_missing_coords = []
-    for idx, pos in enumerate(missing_positions):
+    # {RL 28/06/2025} Calculate confidence scoring of missing trees
+    missing_coords = []
+    for pos in missing_positions:
         point_wgs = gpd.GeoSeries([pos['geometry']], crs=epsg_metric).to_crs("EPSG:4326").iloc[0]
         
-        # Enhanced confidence calculation with cluster info
         distance = pos['distance_to_nearest']
         nearby_count = pos.get('nearby_tree_count', 0)
-        cluster_size = pos.get('cluster_size', 1)
         
-        # Factor in distance, surrounding tree density, and clustering
-        if distance > 8.0 and nearby_count <= 1:
+        if distance > 4.5 and nearby_count <= 3:
             confidence = "high"
-        elif distance > 6.0 and nearby_count <= 2:
-            confidence = "medium"
-        elif distance > 4.5 and nearby_count <= 3:
-            confidence = "low"
         else:
-            confidence = "very_low"
+            continue
         
-        # Boost confidence slightly for clustered positions (multiple detections)
-        if cluster_size > 1 and confidence == "low":
-            confidence = "medium"
-        elif cluster_size > 2 and confidence == "medium":
-            confidence = "high"
-        
-        missing_coord = {
+        missing_coords.append({
             "lat": point_wgs.y,
             "lng": point_wgs.x,
             "confidence": confidence,
             "distance_to_nearest": round(distance, 1),
             "nearby_tree_count": nearby_count,
-            "original_pos": pos  # Keep reference to original position for clustering
-        }
-        
-        # Add cluster info if position was merged from multiple detections
-        if cluster_size > 1:
-            missing_coord["merged_from"] = cluster_size
-        
-        initial_missing_coords.append(missing_coord)
+            "x": pos['x'],  # Keep projected coords for clustering
+            "y": pos['y']
+        })
     
-    # Filter out very low confidence results before clustering
-    filtered_coords = [m for m in initial_missing_coords if m["confidence"] != "very_low"]
-    
-    print(f"\n=== CLUSTERING IN FORMAT_RESULTS ===")
-    print(f"Before clustering: {len(filtered_coords)} positions")
-    
-    # Now cluster overlapping positions in projected coordinates
-    tree_spacing = 4.0  # Default spacing
-    overlap_threshold = tree_spacing * 1.8  # Increased threshold to catch positions within ~7m
-    
-    # First, let's debug the distances between all positions
-    print("Pairwise distances:")
-    for i in range(len(filtered_coords)):
-        for j in range(i + 1, len(filtered_coords)):
-            pos1 = filtered_coords[i]['original_pos']
-            pos2 = filtered_coords[j]['original_pos']
-            distance = np.sqrt((pos1['x'] - pos2['x'])**2 + (pos1['y'] - pos2['y'])**2)
-            should_cluster = "YES" if distance <= overlap_threshold else "NO"
-            print(f"Position {i} to {j}: {distance:.2f}m - Should cluster: {should_cluster}")
-    
+    # {RL 28/06/2025} Then cluster overlapping trees and average coordinates.
     clustered_coords = []
-    processed = set()
+    used = set()
+    overlap_threshold = OVERLAP_THRESHOLD_METRES
     
-    for i, current_coord in enumerate(filtered_coords):
-        if i in processed:
+    for i, coord1 in enumerate(missing_coords):
+        if i in used:
             continue
             
-        # Start a new cluster with current position
-        cluster = [current_coord]
-        cluster_indices = {i}
+        cluster = [coord1]
+        cluster_indices = [i]
         
-        # Use a queue to handle transitive overlaps (A overlaps B, B overlaps C)
-        queue = [i]
-        
-        while queue:
-            current_idx = queue.pop(0)
-            current_pos = filtered_coords[current_idx]['original_pos']
-            current_x, current_y = current_pos['x'], current_pos['y']
+        for j in range(i + 1, len(missing_coords)):
+            if j in used:
+                continue
+                
+            distance = np.sqrt((coord1['x'] - missing_coords[j]['x'])**2 + 
+                             (coord1['y'] - missing_coords[j]['y'])**2)
             
-            # Check all remaining unprocessed positions
-            for j, other_coord in enumerate(filtered_coords):
-                if j in cluster_indices or j in processed:
-                    continue
-                    
-                other_pos = other_coord['original_pos']
-                other_x, other_y = other_pos['x'], other_pos['y']
-                
-                # Calculate distance in projected coordinates (meters)
-                distance = np.sqrt((current_x - other_x)**2 + (current_y - other_y)**2)
-                
-                # If positions overlap, add to cluster
-                if distance <= overlap_threshold:
-                    print(f"Clustering positions {current_idx} and {j} (distance: {distance:.2f}m)")
-                    cluster.append(other_coord)
-                    cluster_indices.add(j)
-                    queue.append(j)  # Check this new position for more overlaps
+            if distance <= overlap_threshold:
+                cluster.append(missing_coords[j])
+                cluster_indices.append(j)
         
-        # Mark all positions in this cluster as processed
-        processed.update(cluster_indices)
+        used.update(cluster_indices)
         
-        # Process the cluster
         if len(cluster) == 1:
-            # Single position, keep as is but remove original_pos reference
-            coord = cluster[0].copy()
-            del coord['original_pos']
-            clustered_coords.append(coord)
+            final_coord = {k: v for k, v in cluster[0].items() if k not in ['x', 'y']}
         else:
-            # Multiple overlapping positions, create averaged position
-            print(f"Merging {len(cluster)} overlapping positions into one")
-            
-            # Average the lat/lng coordinates
-            avg_lat = np.mean([c['lat'] for c in cluster])
-            avg_lng = np.mean([c['lng'] for c in cluster])
-            
-            # Use best metrics from the cluster
-            best_distance = min(c['distance_to_nearest'] for c in cluster)
-            min_nearby_count = min(c['nearby_tree_count'] for c in cluster)
-            best_confidence = max(cluster, key=lambda c: {"high": 3, "medium": 2, "low": 1}[c['confidence']])['confidence']
-            
-            # Create merged position
-            merged_coord = {
-                "lat": avg_lat,
-                "lng": avg_lng,
-                "confidence": best_confidence,
-                "distance_to_nearest": round(best_distance, 1),
-                "nearby_tree_count": min_nearby_count,
+            final_coord = {
+                "lat": np.mean([c['lat'] for c in cluster]),
+                "lng": np.mean([c['lng'] for c in cluster]),
+                "confidence": max(cluster, key=lambda c: {"high": 3, "medium": 2, "low": 1}[c['confidence']])['confidence'],
+                "distance_to_nearest": round(min(c['distance_to_nearest'] for c in cluster), 1),
+                "nearby_tree_count": min(c['nearby_tree_count'] for c in cluster),
                 "merged_from": len(cluster)
             }
-            
-            clustered_coords.append(merged_coord)
-    
-    print(f"After clustering: {len(clustered_coords)} positions")
-    print(f"Reduction: {len(filtered_coords) - len(clustered_coords)} positions merged")
+        
+        clustered_coords.append(final_coord)
     
     return {
         "missing_coords": clustered_coords,
         "existing_tree_coords": existing_coords,
         "summary": {
             "total_existing": len(existing_coords),
-            "total_missing": len(clustered_coords),  # This should now be 4
+            "total_missing": len(clustered_coords),
             "high_confidence": len([m for m in clustered_coords if m["confidence"] == "high"]),
             "medium_confidence": len([m for m in clustered_coords if m["confidence"] == "medium"]),
-            "low_confidence": len([m for m in clustered_coords if m["confidence"] == "low"]),
-            "clustered_results": len([m for m in clustered_coords if m.get("merged_from", 1) > 1]),
-            "individual_results": len([m for m in clustered_coords if m.get("merged_from", 1) == 1])
+            "low_confidence": len([m for m in clustered_coords if m["confidence"] == "low"])
         }
     }
 

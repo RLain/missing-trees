@@ -81,7 +81,7 @@ async def missing_trees(event, context):
         tree_polygons = create_tree_polygons(tree_data)
         # TODO: Delete? tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
 
-        # Create visualization
+        #  {RL 28/06/2025} Purely for developer to help debug with visualization
         folium_map = create_orchard_map(
             tree_polygons=tree_polygons,
             outer_polygon=outer_polygon,
@@ -89,12 +89,8 @@ async def missing_trees(event, context):
             tree_points=results["existing_tree_coords"],
             missing_points=results["missing_coords"],
         )
-
-        # Save map to HTML file (you can adjust this path)
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
-
-        print("Lambda output", results["missing_coords"])
 
         return results["missing_coords"]
 

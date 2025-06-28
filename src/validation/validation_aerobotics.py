@@ -18,3 +18,27 @@ def validate_survey_response(survey: dict) -> tuple[bool, str | None]:
 
     return True, None
 
+
+def validate_tree_survey_response(tree_survey: dict) -> tuple[bool, str | None]:
+    results = tree_survey.get("results")
+    if not results or not isinstance(results, list) or len(results) == 0:
+        return False, "No tree survey results found"
+
+    first_result = results[0]
+    required_fields = {
+        "lat": float,
+        "lng": float,
+        "area": float,
+        "survey_id": int,
+    }
+
+    for field, expected_type in required_fields.items():
+        value = first_result.get(field)
+        if value is None:
+            return False, f"Missing '{field}' in tree survey result"
+        if not isinstance(value, expected_type):
+            return False, f"'{field}' must be of type {expected_type.__name__}"
+
+    return True, None
+
+

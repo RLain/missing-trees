@@ -1,5 +1,5 @@
 from clients.aerobotics_api_client import AeroboticsAPIClient
-from validation.validation_aerobotics import validate_survey_response
+from validation.validation_aerobotics import validate_survey_response, validate_tree_survey_response
 from utils.api_error import ApiError
 from utils.visualisation import create_orchard_map
 from utils.spatial import build_outer_polygon_from_survey, create_missing_tree_polygons, create_tree_polygons, find_missing_tree_positions
@@ -57,14 +57,17 @@ async def missing_trees(event, context):
     outer_polygon = build_outer_polygon_from_survey(survey)
     survey_id = survey["results"][0]["id"]
 
-    # {RL 28/06/2025}: Purely to stop me unecessarily invoking the API for the 508 elements as the dummy data is not changing
-    # if json_path.exists() and json_path.stat().st_size > 0:
-    #     with open(json_path) as f:
-    #         tree_survey = json.load(f)
-    # else:
     client = AeroboticsAPIClient()
     try:
         tree_survey = await client.get_tree_survey(survey_id)
+                
+        valid, error_msg = validate_tree_survey_response(tree_survey)
+        if not valid:
+            return {
+                "statusCode": 500,
+                "body": json.dumps({"The upstream data source did not return required fields": error_msg}),
+                "headers": {"Content-Type": "application/json"},
+            }
     except ApiError as e:
         return {
             "statusCode": e.status,

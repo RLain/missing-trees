@@ -10,6 +10,11 @@ from collections import defaultdict
 from scipy.spatial.distance import pdist
 from scipy.spatial import Voronoi
 
+def build_outer_polygon_from_survey(survey: dict) -> Polygon:
+    coords_str = survey["results"][0]["polygon"]
+    coords = [(float(lng), float(lat)) for lng, lat in (pair.split(',') for pair in coords_str.split())]
+    assert coords[0] == coords[-1], "Polygon ring must be closed"
+    return Polygon(coords)
 
 def create_tree_polygons(tree_data: list[dict], epsg: int = 32734) -> list:
     df = pd.DataFrame(tree_data)

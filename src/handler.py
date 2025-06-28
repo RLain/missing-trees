@@ -1,6 +1,6 @@
 from clients.aerobotics_api_client import AeroboticsAPIClient
 from utils.visualisation import create_orchard_map
-from utils.spatial import create_missing_tree_polygons, create_tree_polygons, find_missing_tree_positions
+from utils.spatial import build_outer_polygon_from_survey, create_missing_tree_polygons, create_tree_polygons, find_missing_tree_positions
 from shapely.geometry import Polygon
 import asyncio
 from pathlib import Path
@@ -15,15 +15,10 @@ async def missing_trees(event, context):
     # TODO: If orchard_id does not exist return 404 
 
     client = AeroboticsAPIClient()
-    
     survey = await client.get_survey(orchard_id)
     # TODO: Directly return Aerobotics error if no 200 OK 
 
-    
-    coords = [(float(lng), float(lat)) for lng, lat in (pair.split(',') for pair in survey["results"][0]["polygon"].split())]
-    assert coords[0] == coords[-1], "Polygon ring must be closed"
-    outer_polygon = Polygon(coords)
-    
+    outer_polygon = build_outer_polygon_from_survey(survey)
     survey_id = survey["results"][0]["id"]
     json_path = Path(__file__).parent / "tree_survey_data.json"
 

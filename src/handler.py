@@ -37,7 +37,6 @@ async def missing_trees(event, context):
     client = AeroboticsAPIClient()
     try:
         survey = await client.get_survey(orchard_id)
-
         valid, error_msg = validate_survey_response(survey)
         if not valid:
             return {
@@ -51,9 +50,8 @@ async def missing_trees(event, context):
             }
 
         survey_id = survey["results"][0]["id"]
-        
+
         tree_survey = await client.get_tree_survey(survey_id)
-        
         valid, error_msg = validate_tree_survey_response(tree_survey)
         if not valid:
             return {
@@ -74,26 +72,23 @@ async def missing_trees(event, context):
             }
             for tree in tree_survey["results"]
         ]
-        
+
         outer_polygon = build_outer_polygon_from_survey(survey)
         results = find_missing_tree_positions(tree_data, outer_polygon)
         inner_boundary_geographic = inner_boundary_visualisation(outer_polygon)
         tree_polygons = create_tree_polygons(tree_data)
-        # TODO: Delete? tree_points = [(poly.centroid.y, poly.centroid.x) for poly in tree_polygons]
 
         #  {RL 28/06/2025} Purely for developer to help debug with visualization
         folium_map = create_orchard_map(
             tree_polygons=tree_polygons,
             outer_polygon=outer_polygon,
             inner_boundary=inner_boundary_geographic,
-            tree_points=results["existing_tree_coords"],
             missing_points=results["missing_coords"],
         )
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
 
         return results["missing_coords"]
-
 
     except ApiError as e:
         return {

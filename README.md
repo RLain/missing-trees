@@ -22,7 +22,7 @@ This repo takes in an orchard_id and returns coordinates for missing trees locat
 Please follow these important first steps:
 
 1. Clone this repository
-2. Set up your local `env` file.
+2. Set up your local `env` file. Use the `.env.sample` to see the required structure.
 3. Run $ make build
 4. Then you can spin up the container and execute the handler using $ make run-handler. This will:
   a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data to make building easier

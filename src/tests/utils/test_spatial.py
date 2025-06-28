@@ -1,8 +1,6 @@
 import unittest
 from shapely.geometry import Polygon
 from utils.spatial import build_outer_polygon_from_survey, create_tree_polygons
-from config import DEFAULT_PROJECTED_CRS, DEFAULT_GEOGRAPHIC_CRS
-
 class TestBuildOuterPolygonFromSurvey(unittest.TestCase):
     def test_valid_polygon(self):
         survey = {

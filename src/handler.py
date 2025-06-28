@@ -64,13 +64,11 @@ async def missing_trees(event, context):
     # Save map to HTML file (you can adjust this path)
     output_path = "/tmp/tree_gaps_map.html"
     folium_map.save(output_path)
+    
+    print("Lambda output", results["missing_coords"])
 
-    # Example return: number of trees and gaps found
-    return {
-        "tree_count": len(tree_polygons),
-        #"gap_count": len(results["missing_coords"].length),
-        #"gaps": [gap.wkt for gap in gaps],
-    }
+    return results["missing_coords"]
+
 
 
 # For local testing

@@ -1,6 +1,6 @@
 import aiohttp
 from typing import Dict, Any, Optional
-from utils.api_error import ApiError
+from src.utils.api_error import ApiError
 class HttpClient:
     def __init__(self, base_url: str, headers: Optional[Dict[str, str]] = None):
         self.base_url = base_url.rstrip("/")

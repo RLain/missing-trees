@@ -1,5 +1,5 @@
 from flask import Flask, request, jsonify
-from api_error import ApiError
+from src.utils.api_error import ApiError
 
 alert_filter = "ERROR:"
 

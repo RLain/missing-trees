@@ -1,4 +1,4 @@
-from data_classes import spatial
+from src.domain import spatial
 import numpy as np
 
 def convert_result_to_analysis(result_dict: dict) -> spatial.OrchardAnalysisResult:

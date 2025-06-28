@@ -3,7 +3,7 @@ import math
 from shapely.geometry import Polygon, Point
 import geopandas as gpd
 import numpy as np
-from config import (
+from src.config.settings import (
     BOTTOM_BUFFER_MULTIPLIER,
     DEFAULT_GEOGRAPHIC_CRS,
     DEFAULT_PROJECTED_CRS,
@@ -19,7 +19,7 @@ from config import (
     TREE_RADIUS_MULTIPLIER,
     TREE_SPACING,
 )
-from validation.spatial import validate_tree_data
+from src.validation.spatial import validate_tree_data
 
 
 def build_outer_polygon_from_survey(survey: dict) -> Polygon:

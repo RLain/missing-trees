@@ -1,6 +1,8 @@
 import unittest
 from shapely.geometry import Polygon
-from utils.spatial import build_outer_polygon_from_survey, create_tree_polygons
+from src.config.settings import DEFAULT_PROJECTED_CRS
+from src.utils.spatial import build_outer_polygon_from_survey, create_tree_polygons
+
 class TestBuildOuterPolygonFromSurvey(unittest.TestCase):
     def test_valid_polygon(self):
         survey = {
@@ -34,7 +36,7 @@ class TestCreateTreePolygons(unittest.TestCase):
             {"lat": -32.1, "lng": 18.1, "area": 12.56},
         ]
 
-        polygons = create_tree_polygons(tree_data)
+        polygons = create_tree_polygons(tree_data, DEFAULT_PROJECTED_CRS)
 
         self.assertIsInstance(polygons, list)
         self.assertTrue(all(hasattr(p, "geom_type") for p in polygons))
@@ -42,12 +44,11 @@ class TestCreateTreePolygons(unittest.TestCase):
 
     def test_missing_key_raises_value_error(self):
         incomplete_data = [
-            {"lat": -32.0, "lng": 18.0},
+            {"lat": -32.0, "lng": 18.0},  # missing 'area'
         ]
         with self.assertRaises(ValueError) as cm:
-            create_tree_polygons(incomplete_data)
-        self.assertIn("Missing one of", str(cm.exception))
-
+            create_tree_polygons(incomplete_data, DEFAULT_PROJECTED_CRS)
+        self.assertIn("Invalid tree data at indices", str(cm.exception))
 
 if __name__ == "__main__":
     unittest.main()

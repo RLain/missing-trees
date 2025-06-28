@@ -1,4 +1,3 @@
-
 from typing import Dict, List
 
 def validate_tree_data(tree_data: List[Dict]) -> None:

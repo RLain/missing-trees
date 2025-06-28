@@ -1,4 +1,5 @@
 from clients.aerobotics_api_client import AeroboticsAPIClient
+from utils.api_error import ApiError
 from utils.visualisation import create_orchard_map
 from utils.spatial import build_outer_polygon_from_survey, create_missing_tree_polygons, create_tree_polygons, find_missing_tree_positions
 from shapely.geometry import Polygon
@@ -8,15 +9,31 @@ from clients.aerobotics_api_client import AeroboticsAPIClient
 import json
 
 #TODO: Pass into API
-orchard_id="216269"
+orchard_id="ABCDE"
 
 async def missing_trees(event, context):
     # TODO: Return orchard_id = event.get("orchard_id", "216269")
     # TODO: If orchard_id does not exist return 404 
 
     client = AeroboticsAPIClient()
-    survey = await client.get_survey(orchard_id)
-    # TODO: Directly return Aerobotics error if no 200 OK 
+    print("orchard_id", orchard_id)
+    try:
+        survey = await client.get_survey(orchard_id)
+    except ApiError as e:
+        return {
+            "statusCode": e.status,
+            "body": json.dumps({
+                "error": {
+                    "message": e.message,
+                    "status": e.status,
+                }
+            }),
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        }
+    finally:
+        await client.close()
 
     outer_polygon = build_outer_polygon_from_survey(survey)
     survey_id = survey["results"][0]["id"]

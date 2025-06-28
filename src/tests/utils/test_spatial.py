@@ -2,7 +2,6 @@ import unittest
 from shapely.geometry import Polygon
 from utils.spatial import build_outer_polygon_from_survey
 
-
 class TestBuildOuterPolygonFromSurvey(unittest.TestCase):
     def test_valid_polygon(self):
         survey = {

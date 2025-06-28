@@ -1,32 +1,31 @@
 import aiohttp
-import asyncio
-from environment import environment
-
+from typing import Dict, Any, Optional
+from utils.api_error import ApiError
 class HttpClient:
-    def __init__(self):
-        self.aerobotics_api_base_url = environment.env("AEROBOTICS_BASE_URL")
-        self.aerobotics_api_key = environment.env("AEROBOTICS_API_KEY")
-        self.headers = {
-            "Accept": "application/json",
-            "Authorization": f"Bearer {self.aerobotics_api_key}",
-            "Content-Type": "application/json"
-        }
+    def __init__(self, base_url: str, headers: Optional[Dict[str, str]] = None):
+        self.base_url = base_url.rstrip("/")
+        self.headers = headers or {}
+        self.session = aiohttp.ClientSession()
+
+    async def get(self, url: str) -> Dict[str, Any]:
+        full_url = f"{self.base_url}/{url.lstrip('/')}"
         
-        print("AEROBOTICS_BASE_URL", self.aerobotics_api_base_url)
-
-    async def get(self, url: str, json: bool = True):
-        full_url = f"{self.aerobotics_api_base_url}{url}"
-        print(f"** GET : HTTPClient URL: {full_url}")
-
-        async with aiohttp.ClientSession() as session:
+        async with self.session.get(full_url, headers=self.headers) as response:
+            status = response.status
             try:
-                async with session.get(full_url, headers=self.headers) as response:
-                    if json:
-                        try:
-                            return await response.json()
-                        except Exception as err:
-                            print(err)
-                            print("GET : response could not be converted to JSON", response)
-            except Exception as err:
-                print("Fetch GET request failed.")
-                print(err)
+                body = await response.json()
+            except Exception:
+                body = {"message": "Unexpected error", "name": "InvalidJSON"}
+
+            if status != 200:
+                error_message = body.get("detail") or body.get("message") or f"API returned {status}"
+                raise ApiError(
+                    status=status,
+                    message=error_message,
+                    body=body
+                )
+
+            return body
+
+    async def close(self):
+        await self.session.close()

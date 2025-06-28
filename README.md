@@ -1,25 +1,31 @@
 # 🌳 Welcome to Rebecca Lain's missing tree API
 
+This repo takes in an orchard_id and returns coordinates for missing trees located on the farm.
+
 ## 🗣️ Context sharing
 
-- EPSG:32734 = UTM Zone 34S (metric)
-- EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long)
+- EPSG stands for European Petroleum Survey Group and is a scientific organization that maintains a geodetic parameter database with standard codes
+- EPSG:32734 = UTM Zone 34S (metric) (Source)[https://epsg.io/32734]
+- EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long) (Source)[https://epsg.io/4326]
+- geodetic -> geodesy noun ge·​od·​e·​sy jē-ˈä-də-sē : a branch of applied mathematics concerned with the determination of the size and shape of the earth and the exact positions of points on its surface and with the description of variations of its gravity field
 
 ## ⬇️ Things to install
 
 - Docker (For Mac)[https://docs.docker.com/desktop/setup/install/mac-install/]
 
+## 🔢 Things to config _(if applicable)
+
+- Head to `config.py` to see configuration options
 
 ## 👩‍💻 Running locally
 
 Please follow these important first steps:
 
 1. Clone this repository
-2. Set up your local `env` file.
+2. Set up your local `env` file. Use the `.env.sample` to see the required structure.
 3. Run $ make build
 4. Then you can spin up the container and execute the handler using $ make run-handler. This will:
   a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data to make building easier
-  b) Execute the GET requests against the Aerobotics API and store the response on tree_survey_data.json (purely to stop me hammering the API during the build)
 
 Addition commands:
 • Exiting a docker container $ exit

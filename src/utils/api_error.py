@@ -1,12 +1,12 @@
 class ApiError(Exception):
-    def __init__(self, status: int = 500, message: str = "Invalid API request"):
-        self.name = self.__class__.__name__
+    def __init__(self, status: int, message: str, body: dict = None):
+        super().__init__(message)
         self.status = status
         self.message = message
-        super().__init__(self.message)
+        self.body = body or {}
 
     def __str__(self):
-        return f"{self.name}({self.status}): {self.message}"
+        return f"{self.__class__.__name__}({self.status}): {self.message}"
 
     @staticmethod
     def serialize(error: "ApiError") -> dict:

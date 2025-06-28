@@ -2,8 +2,7 @@ import time
 import logging
 import pytest
 pytest_plugins = ("pytest_asyncio",)
-
-import utils.time_utils as time_utils
+import src.utils.time_utils as time_utils
 
 @pytest.mark.asyncio
 async def test_sleep():

@@ -8,8 +8,8 @@ run:
 	docker run -it --rm -v "$$PWD":/app -w /app missing_trees bash
 
 run_handler:
-	docker run --rm -v "$$PWD":/app -v "$$PWD/tmp":/tmp -w /app missing_trees bash -c "cd src && python handler.py"
+	docker run --rm -v "$$PWD":/app -v "$$PWD/tmp":/tmp -w /app -e PYTHONPATH=/app missing_trees python src/api/handler.py
 	
 test:
-	docker run --rm -v $(shell pwd):/app -w /app -e PYTHONPATH=/app/src missing_trees pytest -v -s src/tests
+	docker run --rm -v $(shell pwd):/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
 

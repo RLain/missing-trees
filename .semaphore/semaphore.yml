@@ -35,6 +35,7 @@ blocks:
       jobs:
         - name: Pytest
           commands:
+            - docker build -t missing_trees .
             - docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
 
   - name: Run Linter
@@ -44,6 +45,7 @@ blocks:
       jobs:
         - name: Flake8 Lint
           commands:
+            - docker build -t missing_trees .
             - docker run --rm -v "$PWD":/app -w /app missing_trees flake8 src tests
 
 promotions:

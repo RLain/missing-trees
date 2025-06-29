@@ -1,1 +1,106 @@
-To Add
+openapi: 3.0.3
+info:
+  title: Orchard API
+  version: 1.0.0
+  description: API to retrieve missing tree data for a specific orchard.
+
+servers:
+  - url: http://localhost:3000
+
+paths:
+  /orchard/{orchard_id}:
+    get:
+      summary: Get missing tree data for a specific orchard
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: orchard_id
+          in: path
+          required: true
+          schema:
+            type: integer
+          description: Unique identifier for the orchard.
+      responses:
+        '200':
+          description: Successfully retrieved orchard data
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  missing_trees:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        lat:
+                          type: number
+                          format: float
+                        lng:
+                          type: number
+                          format: float
+                        confidence:
+                          type: string
+                          enum: [high, medium, low]
+                        distance_to_nearest:
+                          type: number
+                          format: float
+                        merged_from:
+                          type: integer
+                          nullable: true
+                  summary:
+                    type: object
+                    properties:
+                      total_existing:
+                        type: integer
+                      total_missing:
+                        type: integer
+                      high_confidence:
+                        type: integer
+                      medium_confidence:
+                        type: integer
+                      low_confidence:
+                        type: integer
+        '400':
+          description: Missing orchard_id path parameter
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '401':
+          description: Missing or invalid bearer token
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '404':
+          description: Orchard not found
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+        '500':
+          description: Internal server error (e.g., upstream data missing fields)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  error:
+                    type: string
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT

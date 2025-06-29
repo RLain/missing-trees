@@ -1,0 +1,55 @@
+version: v1.0
+name: Python Docker Pipeline
+agent:
+  machine:
+    type: e1-standard-2
+    os_image: ubuntu2004
+
+auto_cancel:
+  running:
+    when: 'true'
+
+global_job_config:
+  prologue:
+    commands:
+      - checkout
+  env_vars:
+    - name: PYTHONPATH
+      value: /app
+
+blocks:
+  - name: Build Docker Image
+    dependencies: []
+    task:
+      jobs:
+        - name: Docker Build
+          commands:
+            - docker build -t missing_trees .
+
+  - name: Run Tests
+    dependencies:
+      - Build Docker Image
+    task:
+      secrets:
+        - name: AWS Personal
+      jobs:
+        - name: Pytest
+          commands:
+            - docker build -t missing_trees .
+            - docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
+
+  - name: Run Linter
+    dependencies:
+      - Build Docker Image
+    task:
+      jobs:
+        - name: Flake8 Lint
+          commands:
+            - docker build -t missing_trees .
+            - docker run --rm -v "$PWD":/app -w /app missing_trees flake8 src tests
+
+promotions:
+  - name: Promote to staging
+    pipeline_file: deploy_to_staging.yml
+    auto_promote:
+      when: branch = 'main' AND result = 'passed'

@@ -1,0 +1,21 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Resources:
+  MissingTreesFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: MissingTreesFunction
+      Runtime: python3.11
+      Handler: src.api.handler.missing_trees
+      Timeout: 600
+      CodeUri: .
+      Events:
+        MissingTreesApi:
+          Type: Api
+          Properties:
+            Path: /orchard/{orchard_id}
+            Method: get
+      Environment:
+        Variables:
+          AEROBOTICS_API_KEY: dummy-value-for-local-testing

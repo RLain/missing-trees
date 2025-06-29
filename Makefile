@@ -4,6 +4,9 @@ build:
 clean:
 	find . -name "__pycache__" -exec rm -rf {} + -o -name "*.pyc" -delete
 
+lint:
+	docker run --rm -v "${PWD}:/app" -w /app missing_trees flake8 src tests
+
 run:
 	docker run -it --rm -v "$$PWD":/app -w /app missing_trees bash
 

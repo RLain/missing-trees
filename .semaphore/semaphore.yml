@@ -1,54 +1,50 @@
 version: v1.0
-name: Initial Pipeline
+name: Python Docker Pipeline
 agent:
   machine:
     type: e1-standard-2
     os_image: ubuntu2004
+
 auto_cancel:
   running:
     when: 'true'
+
 global_job_config:
   prologue:
     commands:
       - checkout
   env_vars:
-    - name: NODE_ENV
-      value: test
+    - name: PYTHONPATH
+      value: /app
+
 blocks:
-  - name: Setup dependencies
+  - name: Build Docker Image
     dependencies: []
     task:
       jobs:
-        - name: Install and store
+        - name: Docker Build
           commands:
-            - npm ci
-            - cache store
-  - name: Linting
-    dependencies:
-      - Setup dependencies
-    task:
-      prologue:
-        commands:
-          - cache restore
-      jobs:
-        - name: 'Lint everything'
-          commands:
-            - npm run lint
+            - docker build -t missing_trees .
 
-  - name: Tests
+  - name: Run Tests
     dependencies:
-      - Linting
+      - Build Docker Image
     task:
       secrets:
         - name: AWS ProServices Sandbox
-      prologue:
-        commands:
-          - cache restore
-          - mv .env.sample .env
       jobs:
-        - name: 'Unit & Integration tests'
+        - name: Pytest
           commands:
-            - npm run test:unit
+            - docker run --rm -v "$PWD":/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
+
+  - name: Run Linter
+    dependencies:
+      - Build Docker Image
+    task:
+      jobs:
+        - name: Flake8 Lint
+          commands:
+            - docker run --rm -v "$PWD":/app -w /app missing_trees flake8 src tests
 
 promotions:
   - name: Promote to staging

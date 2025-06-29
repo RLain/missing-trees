@@ -2,6 +2,7 @@ aiohttp
 boto3
 environs
 flask
+flake8
 folium
 geopandas
 numpy

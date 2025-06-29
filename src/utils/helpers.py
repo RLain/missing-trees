@@ -1,6 +1,7 @@
 from src.domain import spatial
 import numpy as np
 
+
 def convert_result_to_analysis(result_dict: dict) -> spatial.OrchardAnalysisResult:
     def clean_value(value):
         if isinstance(value, (np.float32, np.float64)):
@@ -31,6 +32,7 @@ def convert_result_to_analysis(result_dict: dict) -> spatial.OrchardAnalysisResu
         summary=summary
     )
 
+
 def orchard_result_to_dict(result: spatial.OrchardAnalysisResult) -> dict:
     return {
         "missing_trees": [
@@ -45,3 +47,4 @@ def orchard_result_to_dict(result: spatial.OrchardAnalysisResult) -> dict:
         ],
         "summary": result.summary
     }
+

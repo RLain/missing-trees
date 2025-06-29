@@ -13,11 +13,11 @@ from src.utils.spatial import (
     inner_boundary_visualisation,
 )
 import asyncio
-from src.clients.aerobotics_api_client import AeroboticsAPIClient
 import json
 
 # TODO: Pass into API
 orchard_id = "216269"
+
 
 async def missing_trees(event, context):
     # TODO: Continue with when focusing on deployment - 404 is working
@@ -88,9 +88,8 @@ async def missing_trees(event, context):
         )
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
-
         result_to_analysis = convert_result_to_analysis(results)
-        
+
         return orchard_result_to_dict(result_to_analysis)
 
     except ApiError as e:
@@ -106,8 +105,6 @@ async def missing_trees(event, context):
 
 # For local testing
 if __name__ == "__main__":
-    import sys
-
     event = {"orchard_id": orchard_id}
     context = {}
 

@@ -3,19 +3,21 @@ from src.utils.api_error import ApiError
 from .http_client import HttpClient
 from src.utils.time_utils import start_time_in_ms, log_elapsed_time_in_ms
 from src.config.environment import environment
+
+
 class AeroboticsAPIClient(HttpClient):
     def __init__(self):
-            headers = {
-                "Accept": "application/json",
-                "Authorization": f"Bearer {environment.aerobotics_api_key}",
-                "Content-Type": "application/json",
-            }
-            super().__init__(base_url=environment.aerobotics_api_base_url, headers=headers)        
+        headers = {
+            "Accept": "application/json",
+            "Authorization": f"Bearer {environment.aerobotics_api_key}",
+            "Content-Type": "application/json",
+        }
+        super().__init__(base_url=environment.aerobotics_api_base_url, headers=headers)
 
     async def get_survey(self, orchard_id: str):
         url = f"farming/surveys?orchard_id={orchard_id}"
         start = start_time_in_ms()
-        
+
         full_url = f"{self.base_url}/{url}"
         print(f"** GET : HTTPClient URL: {full_url}")
 
@@ -28,11 +30,11 @@ class AeroboticsAPIClient(HttpClient):
         else:
             log_elapsed_time_in_ms(start, f"Get survey {orchard_id}")
             return survey
-    
+
     async def get_tree_survey(self, survey_id: str) -> Dict[str, Any]:
         url = f"farming/surveys/{survey_id}/tree_surveys/"
         start = start_time_in_ms()
-        
+
         full_url = f"{self.base_url}/{url}"
         print(f"** GET : HTTPClient URL: {full_url}")
 

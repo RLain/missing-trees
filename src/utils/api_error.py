@@ -19,5 +19,6 @@ class ApiError(Exception):
     @staticmethod
     def deserialize(data: dict) -> "ApiError":
         if data.get("__class") != ApiError.__name__:
-            raise ValueError(f"Cannot deserialize object that is not a {ApiError.__name__}")
+            raise ValueError(
+                f"Cannot deserialize object that is not a {ApiError.__name__}")
         return ApiError(status=data.get("status", 500), message=data.get("message", "Invalid API request"))

@@ -2,6 +2,7 @@ import folium
 from typing import List, Dict, Optional
 from shapely.geometry import Polygon
 
+
 def create_orchard_map(
     tree_polygons: List,
     outer_polygon: Polygon,
@@ -76,9 +77,9 @@ def create_orchard_map(
     folium.LayerControl().add_to(folium_map)
 
     legend_html = """
-    <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 160px; 
-                background-color: white; border:2px solid grey; z-index:9999; 
+    <div style="position: fixed;
+                bottom: 50px; left: 50px; width: 200px; height: 160px;
+                background-color: white; border:2px solid grey; z-index:9999;
                 font-size:14px; padding: 10px">
     <h4>Legend</h4>
     <p><i class="fa fa-circle" style="color:blue"></i> Outer boundary</p>

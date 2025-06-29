@@ -1,20 +1,18 @@
 build_sam:
 	sam build --use-container --cached
 
-start_api:
-	sam local start-api --host 0.0.0.0 --port 3000
-
-start_api_debug:
-	sam local start-api --host 0.0.0.0 --port 3000 --debug
-
-
-
 clean:
 	find . -name "__pycache__" -exec rm -rf {} + -o -name "*.pyc" -delete
 	rm -rf .aws-sam
 
 lint:
 	docker run --rm -v "${PWD}:/app" -w /app missing_trees flake8 src tests
+
+start_api:
+	sam local start-api --host 0.0.0.0 --port 3000
+
+start_api_debug:
+	sam local start-api --host 0.0.0.0 --port 3000 --debug
 
 test:
 	docker run --rm -v $(shell pwd):/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests

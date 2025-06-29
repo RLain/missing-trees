@@ -96,7 +96,7 @@ async def missing_trees_async(event, context):
         print("...Finding missing trees")
         start = start_time_in_ms()
         results = find_missing_tree_positions(tree_data, outer_polygon)
-        log_elapsed_time_in_ms(start, f"Processed  find_missing_tree_positions")
+        log_elapsed_time_in_ms(start, f"Processed find_missing_tree_positions")
 
         print("Creating orchard map...")
         #  {RL 28/06/2025} Purely for developer to help debug with visualization

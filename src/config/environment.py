@@ -13,7 +13,7 @@ class Environment:
     def _initialize(self):
         self.env = Env()
         self.env.read_env()
-        self.aerobotics_api_key = self.env.str("AEROBOTICS_API_KEY")
+        self.aerobotics_api_key = self.env.str("AEROBOTICS_API_KEY") #{RL 29/06/2025} No longer in use - keeping in as an example of an environment set up
 
 
 environment = Environment()

@@ -2,7 +2,6 @@ from typing import Any, Dict
 from src.utils.api_error import ApiError
 from .http_client import HttpClient
 from src.utils.time_utils import start_time_in_ms, log_elapsed_time_in_ms
-from src.config.environment import environment
 
 
 class AeroboticsAPIClient(HttpClient):

@@ -15,7 +15,7 @@ from src.utils.spatial import (
 )
 import asyncio
 import json
-  
+
 
 def missing_trees(event, context):
     print("Missing tree handler invoked...")
@@ -25,21 +25,22 @@ def missing_trees(event, context):
 async def missing_trees_async(event, context):
     headers = event.get('headers', {})
     bearer_token = headers.get('Authorization', '').replace('Bearer ', '')
-    
+    orchard_id = None
+
     if not bearer_token:
         return {
             "statusCode": 401,
             "headers": {"Content-Type": "application/json"},
             "body": json.dumps({"error": "Bearer token required"}),
         }
-        
+
     if "pathParameters" in event and event["pathParameters"]:
         orchard_id = event["pathParameters"].get("orchard_id")
 
     # {RL 28/06/2025} Without an orchard_id, get_survey returns multiple surveys for different farms
     if not orchard_id:
         return {
-            "statusCode": 404,
+            "statusCode": 400,
             "body": '{"error": "orchard_id path parameter is required"}',
             "headers": {
                 "Content-Type": "application/json"
@@ -108,11 +109,11 @@ async def missing_trees_async(event, context):
         )
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
-        
+
         print("Analysing results...")
         result_to_analysis = convert_result_to_analysis(results)
         orchard_results_dict = orchard_result_to_dict(result_to_analysis)
-    
+
         print("Returning 200 OK")
         return {
             "statusCode": 200,
@@ -129,11 +130,3 @@ async def missing_trees_async(event, context):
     finally:
         await client.close()
 
-
-# For local testing
-if __name__ == "__main__":
-    event = {"orchard_id": orchard_id}
-    context = {}
-
-    result = asyncio.run(missing_trees(event, context))
-    print("Lambda handler result:", result)

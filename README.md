@@ -1,6 +1,6 @@
 # 🌳 Welcome to Rebecca Lain's missing tree API
 
-This repo takes in an orchard_id and returns coordinates for missing trees located on the farm.
+This repo is an API that takes in an orchard_id param and returns coordinates for missing trees located on the farm.
 
 ## 🗣️ Context sharing
 
@@ -25,16 +25,19 @@ This repo takes in an orchard_id and returns coordinates for missing trees locat
 Please follow these important first steps:
 
 1. Clone this repository
-2. Set up your local `env` file. Use the `.env.sample` to see the required structure.
+2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
 3. Open docker
 4. $ make build_sam - _note to give this a moment, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
 ```bash
 Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
 /tmp/samcli/source:ro,delegated, inside runtime container  
 ```
-5. $ sam validate - this should pass with `is a valid SAM Template`
-6. $ make start_api
-7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run $ curl http://localhost:3000/orchard/orchard_id - replace orchard_id
+5. Run $ sam validate - this should pass with `is a valid SAM Template`
+6. Run $ make start_api
+7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
+```bash
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
+```
 
 NB: The API is unacceptably slow (sorry). Have patience with ...Finding missing trees. This takes a long ol' time.
 ```bash

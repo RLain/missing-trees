@@ -11,6 +11,11 @@ Resources:
       Timeout: 600
       CodeUri: .
       Events:
+        MissingTreesApiBase:
+          Type: Api
+          Properties:
+            Path: /orchard
+            Method: get
         MissingTreesApi:
           Type: Api
           Properties:

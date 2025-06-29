@@ -18,7 +18,7 @@ import json
   
 
 def missing_trees(event, context):
-    print("Reached missing_trees - kicking off asyncio")
+    print("Missing tree handler invoked...")
     return asyncio.run(missing_trees_async(event, context))
 
 

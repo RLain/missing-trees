@@ -13,8 +13,8 @@ This repo is an API that takes in an orchard_id param and returns coordinates fo
 
 - (Docker)[https://docs.docker.com/desktop/setup/install/mac-install/]
 - SAM set up. Example using (brew)[https://brew.sh/]
-  a. $ brew tap aws/tap
-  b. $ brew install aws-sam-cli
+  - a. $ brew tap aws/tap
+  - b. $ brew install aws-sam-cli
 
 ## 🔢 Things to config _(if applicable)_
 
@@ -26,7 +26,7 @@ Please follow these important first steps:
 
 1. Clone this repository
 2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
-3. Open docker
+3. Open docker on your desktop
 4. $ make build_sam - _note to give this a moment, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
 ```bash
 Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
@@ -61,10 +61,10 @@ REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  
 ```
 
 Additional commands:
-• Exiting a docker container $ exit
-• To see python packages intalled on the running container $ pip list
-• To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
-• To check NPM packages intall on container: $ npm list -g --depth=0
+- Exiting a docker container $ exit
+- To see python packages intalled on the running container $ pip list
+- To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
+- To check NPM packages intall on container: $ npm list -g --depth=0
 
 ## Testing
 

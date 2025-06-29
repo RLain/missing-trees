@@ -31,7 +31,7 @@ blocks:
       - Build Docker Image
     task:
       secrets:
-        - name: AWS ProServices Sandbox
+        - name: AWS Personal
       jobs:
         - name: Pytest
           commands:

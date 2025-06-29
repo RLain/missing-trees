@@ -113,6 +113,7 @@ async def missing_trees_async(event, context):
         result_to_analysis = convert_result_to_analysis(results)
         orchard_results_dict = orchard_result_to_dict(result_to_analysis)
     
+        print("Returning 200 OK")
         return {
             "statusCode": 200,
             "body": json.dumps(orchard_results_dict)

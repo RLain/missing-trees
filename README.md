@@ -56,11 +56,6 @@ END RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7
 REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  Duration: 241573.03 ms     Billed Duration: 241574 ms      Memory Size: 128 MB     Max Memory Used: 128 MB
 ```
 
-To run the function directly using docker:
-- Run $ make build
-- Then you can spin up the container and execute the handler using $ make run-handler. This will:
-  a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data to make building easier
-
 Additional commands:
 • Exiting a docker container $ exit
 • To see python packages intalled on the running container $ pip list

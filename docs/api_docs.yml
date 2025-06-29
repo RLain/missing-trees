@@ -11,6 +11,14 @@ paths:
   /orchard/{orchard_id}:
     get:
       summary: Get missing tree data for a specific orchard
+      description: |
+        Retrieve geolocation and confidence data about missing trees in a given orchard.
+        Requires a valid bearer token for authentication.
+        
+        #### Example `curl` request:
+        ```bash
+        curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/216269
+        ```
       security:
         - bearerAuth: []
       parameters:
@@ -25,6 +33,34 @@ paths:
           description: Successfully retrieved orchard data
           content:
             application/json:
+              example:
+                missing_trees:
+                  - lat: -32.3289022257133
+                    lng: 18.825840597478866
+                    confidence: high
+                    distance_to_nearest: 4.9
+                    merged_from: null
+                  - lat: -32.32880447872082
+                    lng: 18.82644837785504
+                    confidence: high
+                    distance_to_nearest: 4.8
+                    merged_from: 4
+                  - lat: -32.328673098476315
+                    lng: 18.82667457619352
+                    confidence: high
+                    distance_to_nearest: 5.7
+                    merged_from: null
+                  - lat: -32.3286284863087
+                    lng: 18.825655950939435
+                    confidence: high
+                    distance_to_nearest: 5.7
+                    merged_from: null
+                summary:
+                  total_existing: 508
+                  total_missing: 4
+                  high_confidence: 4
+                  medium_confidence: 0
+                  low_confidence: 0
               schema:
                 type: object
                 properties:

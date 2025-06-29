@@ -2,13 +2,17 @@ aiohttp
 boto3
 environs
 flask
+flake8
 folium
 geopandas
-numpy
+numpy<1.25 #[1]
 pandas
 pyproj
 pytest
 pytest-asyncio
 requests
 shapely
-scikit-learn
+
+# [1] {RL 29/06/25} sam build --use-container uses AWS’s official Lambda build image (based on Amazon Linux).
+# That image has an older GCC compiler version (7.3.1).
+# Newer NumPy versions require a newer GCC (>= 9.3) to build from source.

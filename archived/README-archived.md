@@ -1,0 +1,2 @@
+This is a home for things attempted, tried and scrapped. I have not included every file I scrapped (there were many!) but started moving stuff into here
+near the end of Sunday to maintain sanity on what I am actually using - whilst retaining context of what I tried.

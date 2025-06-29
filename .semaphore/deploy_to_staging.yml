@@ -1,55 +1,48 @@
 version: v1.0
-name: Deploy to staging
+name: Deploy to Staging
 agent:
   machine:
     type: e1-standard-2
     os_image: ubuntu2004
+
 auto_cancel:
   running:
     when: 'true'
+
 global_job_config:
   prologue:
     commands:
       - sudo pip install awscli
       - checkout
-      # - nvm install
   env_vars:
-    - name: NODE_ENV
+    - name: ENV
       value: staging
+    - name: PYTHONPATH
+      value: /app
+
 blocks:
-  - name: Setup dependencies
-    dependencies: []
-    task:
-      jobs:
-        - name: Install and store
-          commands:
-            - npm ci
-            - cache store
-  # becca-playground-application function
-  - name: Deploy becca-playground-application function
-    dependencies:
-      - Setup dependencies
-    run:
-      when: branch = 'main'
+  - name: Deploy Lambda Function
+    # run:
+    #   when: branch = 'main'
     task:
       secrets:
-        - name: AWS ProServices Sandbox
+        - name: AWS Personal
       prologue:
         commands:
-          - cache restore
           - mv .env.sample .env
       jobs:
-        - name: Deploy lambda function
-          commands:
-            - npm run deploy:staging
-          matrix:
-            - env_var: AWS_REGION_VARIABLE_APP
-              values:
-                - af-south-1
-            - env_var: AWS_ACCOUNT
-              values:
-                - 'REPLACE-WITH-ACCOUNT-NUMBER'
+      #TODO: Not yet working - shifted focus back to local deployment
+      - name: Deploy via Serverless CLI container
+        commands:
+          - docker build -t my-serverless -f dockerfile.serverless .
+          - >
+            docker run --rm -v "$PWD":/app -w /app
+            -e AWS_ACCESS_KEY_ID -e AWS_SECRET_ACCESS_KEY -e AWS_DEFAULT_REGION=af-south-1
+            -e SERVERLESS_ACCESS_TOKEN=$SERVERLESS_ACCESS_TOKEN
+            my-serverless
+            deploy --stage staging --verbose
 
-promotions:
-  - name: Promote to production
-    pipeline_file: deploy_to_production.yml
+
+# promotions:
+#   - name: Promote to production
+#     pipeline_file: deploy_to_production.yml

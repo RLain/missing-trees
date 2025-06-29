@@ -1,4 +1,6 @@
 from environs import Env
+
+
 class Environment:
     _instance = None
 
@@ -11,12 +13,8 @@ class Environment:
     def _initialize(self):
         self.env = Env()
         self.env.read_env()
+        self.aerobotics_api_key = self.env.str("AEROBOTICS_API_KEY") #{RL 29/06/2025} No longer in use - keeping in as an example of an environment set up
 
-        # Load required env vars here with validation
-        self.aerobotics_api_key = self.env.str("AEROBOTICS_API_KEY")
-        self.aerobotics_api_base_url = self.env.str("AEROBOTICS_BASE_URL")
 
-        # You can add more env vars as needed
-
-# singleton instance to import
 environment = Environment()
+

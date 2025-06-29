@@ -1,5 +1,6 @@
 from src.clients.aerobotics_api_client import AeroboticsAPIClient
 from src.utils.helpers import convert_result_to_analysis, orchard_result_to_dict
+from src.utils.time_utils import log_elapsed_time_in_ms, start_time_in_ms
 from src.validation.aerobotics import (
     validate_survey_response,
     validate_tree_survey_response,
@@ -13,29 +14,41 @@ from src.utils.spatial import (
     inner_boundary_visualisation,
 )
 import asyncio
-from src.clients.aerobotics_api_client import AeroboticsAPIClient
 import json
 
-# TODO: Pass into API
-orchard_id = "216269"
 
-async def missing_trees(event, context):
-    # TODO: Continue with when focusing on deployment - 404 is working
+def missing_trees(event, context):
+    print("Missing tree handler invoked...")
+    return asyncio.run(missing_trees_async(event, context))
+
+
+async def missing_trees_async(event, context):
+    headers = event.get('headers', {})
+    bearer_token = headers.get('Authorization', '').replace('Bearer ', '')
+    orchard_id = None
+
+    if not bearer_token:
+        return {
+            "statusCode": 401,
+            "headers": {"Content-Type": "application/json"},
+            "body": json.dumps({"error": "Bearer token required"}),
+        }
+
+    if "pathParameters" in event and event["pathParameters"]:
+        orchard_id = event["pathParameters"].get("orchard_id")
+
     # {RL 28/06/2025} Without an orchard_id, get_survey returns multiple surveys for different farms
-    # orchard_id = None
-    # if "pathParameters" in event and event["pathParameters"]:
-    #     orchard_id = event["pathParameters"].get("orchard_id")
+    if not orchard_id:
+        return {
+            "statusCode": 400,
+            "body": '{"error": "orchard_id path parameter is required"}',
+            "headers": {
+                "Content-Type": "application/json"
+            }
+        }
 
-    # if not orchard_id:
-    #     return {
-    #         "statusCode": 404,
-    #         "body": '{"error": "orchard_id path parameter is required"}',
-    #         "headers": {
-    #             "Content-Type": "application/json"
-    #         }
-    #     }
-
-    client = AeroboticsAPIClient()
+    print("Setting up AeroboticsAPIClient and invoking API...")
+    client = AeroboticsAPIClient(bearer_token)
     try:
         survey = await client.get_survey(orchard_id)
         valid, error_msg = validate_survey_response(survey)
@@ -74,11 +87,19 @@ async def missing_trees(event, context):
             for tree in tree_survey["results"]
         ]
 
+        print("Kicking off spatial calculations...")
+        print("...Creating outer polygon")
         outer_polygon = build_outer_polygon_from_survey(survey)
-        results = find_missing_tree_positions(tree_data, outer_polygon)
+        print("...Creating inner boundary")
         inner_boundary_geographic = inner_boundary_visualisation(outer_polygon)
+        print("...Creating tree polygons")
         tree_polygons = create_tree_polygons(tree_data)
+        print("...Finding missing trees")
+        start = start_time_in_ms()
+        results = find_missing_tree_positions(tree_data, outer_polygon)
+        log_elapsed_time_in_ms(start, f"Processed find_missing_tree_positions")
 
+        print("Creating orchard map...")
         #  {RL 28/06/2025} Purely for developer to help debug with visualization
         folium_map = create_orchard_map(
             tree_polygons=tree_polygons,
@@ -89,9 +110,15 @@ async def missing_trees(event, context):
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
 
+        print("Analysing results...")
         result_to_analysis = convert_result_to_analysis(results)
-        
-        return orchard_result_to_dict(result_to_analysis)
+        orchard_results_dict = orchard_result_to_dict(result_to_analysis)
+
+        print("Returning 200 OK")
+        return {
+            "statusCode": 200,
+            "body": json.dumps(orchard_results_dict)
+        }
 
     except ApiError as e:
         return {
@@ -103,13 +130,3 @@ async def missing_trees(event, context):
     finally:
         await client.close()
 
-
-# For local testing
-if __name__ == "__main__":
-    import sys
-
-    event = {"orchard_id": orchard_id}
-    context = {}
-
-    result = asyncio.run(missing_trees(event, context))
-    print("Lambda handler result:", result)

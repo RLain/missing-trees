@@ -1,6 +1,6 @@
 # 🌳 Welcome to Rebecca Lain's missing tree API
 
-This repo takes in an orchard_id and returns coordinates for missing trees located on the farm.
+This repo is an API that takes in an orchard_id param and returns coordinates for missing trees located on the farm.
 
 ## 🗣️ Context sharing
 
@@ -9,60 +9,62 @@ This repo takes in an orchard_id and returns coordinates for missing trees locat
 - EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long) (Source)[https://epsg.io/4326]
 - geodetic -> geodesy noun ge·​od·​e·​sy jē-ˈä-də-sē : a branch of applied mathematics concerned with the determination of the size and shape of the earth and the exact positions of points on its surface and with the description of variations of its gravity field
 
-## ⬇️ Things to install
+## ⬇️ Things to install (For Mac)
 
-- Docker (For Mac)[https://docs.docker.com/desktop/setup/install/mac-install/]
+- (Docker)[https://docs.docker.com/desktop/setup/install/mac-install/]
+- SAM set up. Example using (brew)[https://brew.sh/]
+  a. $ brew tap aws/tap
+  b. $ brew install aws-sam-cli
 
-## 🔢 Things to config _(if applicable)
+## 🔢 Things to config _(if applicable)_
 
-- Head to `config.py` to see configuration options
+- Head to `src/config/settings.py` to see configuration options
 
 ## 👩‍💻 Running locally
 
 Please follow these important first steps:
 
 1. Clone this repository
-2. Set up your local `env` file. Use the `.env.sample` to see the required structure.
-3. Run $ make build
-4. Then you can spin up the container and execute the handler using $ make run-handler. This will:
-  a) Spin up /tmp/tree_gaps_map.html for a quick visualisation of the data to make building easier
-
-Addition commands:
-• Exiting a docker container $ exit
-• To see python packages intalled on the running container $ pip list
-
-
-# Infrastructure and Environment variable set up
-
-This middleware runs on the `ProServices Production` account, ID: 706927447862. Please make sure you have configured an AWS profile locally with this name.
-
-## Adding environment variables to serverless and AWS Parameter Store
-
-In order to prevent environment variables being overwritten while deploying updates to the lambda functions with serverless we need to store the values in the AWS Parameter Store.
-
-1. Open AWS and navigate to the AWS SSM Parameter Store.
-2. The variables are defined on the serverless.yml file under the provider.environment path, example: `${ssm(env:AWS_REGION_VARIABLE):/middleware-client-bulk-updater/sls:stage/env/ROOT_API_KEY}`
-3. To add/update a parameter to the Parameter Store with the AWS CLI use the following command,
-
+2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
+3. Open docker
+4. $ make build_sam - _note to give this a moment, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
 ```bash
-aws ssm put-parameter --name /middleware-client-bulk-updater/uat/env/{{NAME OF VARIABLE}} --value staging --type {{TYPE}} --overwrite --profile ProServicesProduction --region af-south-1
-
-Example:
-
-
-aws ssm put-parameter --name /middleware-client-bulk-updater/uat/env/NODE_ENV --value uat --type String --overwrite --profile ProServicesProduction --region af-south-1
-aws ssm put-parameter --name /middleware-client-bulk-updater/uat/env/AWS_REGION_VARIABLE --value af-south-1 --type String --overwrite --profile ProServicesProduction --region af-south-1
-
-
+Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
+/tmp/samcli/source:ro,delegated, inside runtime container  
+```
+5. Run $ sam validate - this should pass with `is a valid SAM Template`
+6. Run $ make start_api
+7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
+```bash
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
 ```
 
-## Deploying to AWS for testing
+NB: The API is unacceptably slow (sorry). Have patience with ...Finding missing trees. This takes a long ol' time but will give a response!
+```bash
+START RequestId: 2944f11c-c41d-42f6-8a41-18999d3c0c7b Version: $LATEST
+Missing tree handler invoked...
+Setting up AeroboticsAPIClient and invoking API...
+** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys?orchard_id=216269
+** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys/25319/tree_surveys/
+Kicking off spatial calculations...
+...Creating outer polygon
+...Creating inner boundary
+...Creating tree polygons
+Total input trees: 508
+...Finding missing trees # <- Very slow
+Identified 4 missing trees
+Creating orchard map...
+Analysing results...
+Returning 200 OK
+END RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7
+REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  Duration: 241573.03 ms     Billed Duration: 241574 ms      Memory Size: 128 MB     Max Memory Used: 128 MB
+```
 
-The [serverless-plugin-typescript](https://www.serverless.com/plugins/serverless-plugin-typescript) automatically ensures that your typescript code compiles before deploying your code, so you don't have to run the `tsc` command manually.
-
-To deploy, run `npm run deploy:dev` and enter the name of the AWS account to deploy to. To use the default account, just press enter.
-
-To remove the app run `npm run remove:dev`.
+Additional commands:
+• Exiting a docker container $ exit
+• To see python packages intalled on the running container $ pip list
+• To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
+• To check NPM packages intall on container: $ npm list -g --depth=0
 
 ## Testing
 
@@ -96,9 +98,6 @@ _To be added_
 
 ## Deploying to AWS
 
-We use `semaphore` to deploy middleware.
+_To be finished_
 
-🚨 Please ensure to update the AWS_REGION_VARIABLE and AWS_ACCOUNT values on the semaphore files if not using the following:
-
-- `AWS_REGION_VARIABLE`: af-south-1
-- `AWS_ACCOUNT`: ProServices Production account
+We use `semaphore` to deploy the middleware. The deployment secrets are stored on `https://rlain.semaphoreci.com/` including AWS and Serverless Framwork.

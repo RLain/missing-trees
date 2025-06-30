@@ -27,10 +27,12 @@ Please follow these important first steps:
 1. Clone this repository
 2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
 3. Open docker on your desktop
-4. $ make build_sam - _note to give this a moment, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
+4. $ make build_sam - _note to give this a moment or roughly 3 mins 40 seconds, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
 ```bash
 Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
 /tmp/samcli/source:ro,delegated, inside runtime container  
+...
+Build Succeeded
 ```
 5. Run $ sam validate - this should pass with `is a valid SAM Template`
 6. Run $ make start_api
@@ -39,7 +41,7 @@ Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as
 curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
 ```
 
-NB: The API is unacceptably slow (sorry).
+NB: The API is unacceptably slow at approx 45s response time (sorry).
 ```bash
 START RequestId: 2944f11c-c41d-42f6-8a41-18999d3c0c7b Version: $LATEST
 Missing tree handler invoked... # This takes a moment to appear...

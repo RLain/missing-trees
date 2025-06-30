@@ -15,10 +15,6 @@ from src.utils.spatial import (
 )
 import asyncio
 import json
-import os
-print(os.getcwd())
-print(os.listdir('.'))
-
 
 def missing_trees(event, context):
     print("Missing tree handler invoked...")
@@ -110,9 +106,6 @@ async def missing_trees_async(event, context):
             inner_boundary=inner_boundary_geographic,
             missing_points=results["missing_coords"],
         )
-        print(f"Saved orchard map to {output_path}")
-        print("Listing directory:")
-        print(os.listdir("/tmp"))  # Or the path you're saving to
         output_path = "/tmp/tree_gaps_map.html"
         folium_map.save(output_path)
 

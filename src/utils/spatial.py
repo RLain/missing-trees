@@ -1,8 +1,10 @@
 import pandas as pd
 import math
 from shapely.geometry import Polygon, Point
+from shapely.strtree import STRtree
 import geopandas as gpd
 import numpy as np
+from scipy.spatial import cKDTree
 from src.config.settings import (
     BOTTOM_BUFFER_MULTIPLIER,
     DEFAULT_GEOGRAPHIC_CRS,
@@ -33,6 +35,13 @@ def build_outer_polygon_from_survey(survey: dict) -> Polygon:
 
 
 def cluster_missing_coords(missing_coords):
+    if not missing_coords:
+        return []
+    
+    # 🤖 Claude: Use spatial indexing for clustering
+    points = np.array([[coord["x"], coord["y"]] for coord in missing_coords])
+    tree = cKDTree(points)
+    
     clustered = []
     used = set()
 
@@ -40,24 +49,15 @@ def cluster_missing_coords(missing_coords):
         if i in used:
             continue
 
-        cluster = [coord1]
-        cluster_indices = [i]
-
-        for j in range(i + 1, len(missing_coords)):
-            if j in used:
-                continue
-
-            distance = np.sqrt(
-                (coord1["x"] - missing_coords[j]["x"]) ** 2
-                + (coord1["y"] - missing_coords[j]["y"]) ** 2
-            )
-
-            if distance <= OVERLAP_THRESHOLD_METRES:
-                cluster.append(missing_coords[j])
-                cluster_indices.append(j)
-
+        # 🤖 Claude: Find all points within threshold distance
+        indices = tree.query_ball_point([coord1["x"], coord1["y"]], OVERLAP_THRESHOLD_METRES)
+        cluster_indices = [idx for idx in indices if idx not in used]
+        
+        if not cluster_indices:
+            continue
+            
+        cluster = [missing_coords[idx] for idx in cluster_indices]
         used.update(cluster_indices)
-
         clustered.append(collapse_cluster(cluster))
 
     return clustered
@@ -78,11 +78,10 @@ def collapse_cluster(cluster):
     }
 
 
-# TODO: Step through and properly understand
 def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
     minx, miny, maxx, maxy = polygon.bounds
     width, height = maxx - minx, maxy - miny
-    htol, vtol = width * 0.1, height * 0.1  # {RL 28/05/2025} 10% buffer
+    htol, vtol = width * 0.1, height * 0.1 # {RL 28/05/2025} 10% buffer
     cx, cy = minx + width / 2, miny + height / 2
 
     def move_point(x, y):
@@ -141,15 +140,10 @@ def create_inner_boundary(outer_polygon, spacing):
     )
 
 
-def create_tree_buffers(coords, radius):
-    return [Point(x, y).buffer(radius) for x, y in coords]
-
-
 def create_tree_polygons(
     tree_data: list[dict], epsg: int = DEFAULT_PROJECTED_CRS
 ) -> list:
     print(f"Total input trees: {len(tree_data)}")
-
     validate_tree_data(tree_data)
 
     tree_data_frame_projected = create_geodataframe_from_tree_data(tree_data)
@@ -162,7 +156,6 @@ def create_tree_polygons(
     )
 
     tree_geographic = tree_data_frame_projected.to_crs(epsg=epsg)
-
     return list(tree_geographic["geometry"])
 
 
@@ -218,7 +211,7 @@ def extract_tree_coordinates(existing_trees):
 
 
 def filter_positions_within_inner_boundary(
-    potential_positions, inner_boundary, existing_coords, spacing
+    potential_positions, inner_boundary, existing_tree_spatial_index, tree_kdtree, existing_coords, spacing
 ):
     filtered_positions = []
     final_check_radius = spacing * TREE_RADIUS_MULTIPLIER * MIN_DISTANCE_MULTIPLIER
@@ -230,11 +223,11 @@ def filter_positions_within_inner_boundary(
         if not inner_boundary.contains(pos["geometry"]):
             continue
 
+        # 🤖 Claude: Use spatial index for faster intersection checks
         test_buffer = pos["geometry"].buffer(final_check_radius)
-        if not any(
-            test_buffer.intersects(Point(x, y).buffer(overlap_check_radius))
-            for x, y in existing_coords
-        ):
+        nearby_trees = list(existing_tree_spatial_index.query(test_buffer))
+        
+        if not any(test_buffer.intersects(tree_geom.buffer(overlap_check_radius)) for tree_geom in nearby_trees):
             filtered_positions.append(pos)
 
     return filtered_positions
@@ -243,22 +236,102 @@ def filter_positions_within_inner_boundary(
 def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
     existing_coords = extract_tree_coordinates(existing_trees)
     existing_points = np.array(existing_coords)
-
+    
     print("......Creating tree buffers")
-    tree_radius = spacing * TREE_RADIUS_MULTIPLIER
-    existing_tree_buffers = create_tree_buffers(existing_coords, tree_radius)
+    tree_geometries = [Point(x, y) for x, y in existing_coords]
+    existing_tree_spatial_index = STRtree(tree_geometries)
+    tree_kdtree = cKDTree(existing_points)
 
-    print("......Generating candidate position (too slow")
-    potential_positions = generate_candidate_positions(
-        outer_polygon, existing_tree_buffers, existing_points, spacing)
+    print("......Generating candidate positions")
+    potential_positions = generate_candidate_positions_optimized(
+        outer_polygon, existing_tree_spatial_index, tree_kdtree, existing_points, spacing
+    )
 
     print("......Generating inner boundary")
     inner_boundary = create_inner_boundary(outer_polygon, spacing)
 
-    print("......Filtering positions within inner boundary (too slow)")
+    print("......Filtering positions within inner boundary")
     return filter_positions_within_inner_boundary(
-        potential_positions, inner_boundary, existing_coords, spacing
+        potential_positions, inner_boundary, existing_tree_spatial_index, tree_kdtree, existing_coords, spacing
     )
+
+
+def generate_candidate_positions_optimized(
+    outer_polygon, existing_tree_spatial_index, tree_kdtree, existing_points, spacing
+):
+    """Optimized version using spatial indexing and vectorized operations"""
+    grid_spacing = spacing * GRID_SPACING_MULTIPLIER
+    minx, miny, maxx, maxy = outer_polygon.bounds
+    
+    # 🤖 Claude: Create grid points
+    x_coords = np.arange(minx, maxx + grid_spacing, grid_spacing)
+    y_coords = np.arange(miny, maxy + grid_spacing, grid_spacing)
+    
+    # 🤖 Claude: Create meshgrid for vectorized operations
+    X, Y = np.meshgrid(x_coords, y_coords)
+    grid_points = np.column_stack([X.ravel(), Y.ravel()])
+    
+    tree_radius = spacing * TREE_RADIUS_MULTIPLIER
+    min_threshold = spacing * MIN_DISTANCE_MULTIPLIER
+    max_threshold = spacing * MAX_DISTANCE_MULTIPLIER
+    nearby_threshold = spacing * NEARBY_SEARCH_MULTIPLIER
+    
+    potential_positions = []
+    
+    # 🤖 Claude: Process in chunks to manage memory
+    chunk_size = 10000
+    for i in range(0, len(grid_points), chunk_size):
+        chunk = grid_points[i:i+chunk_size]
+        
+        # 🤖 Claude: Vectorized polygon containment check
+        chunk_points = [Point(x, y) for x, y in chunk]
+        contained_mask = np.array([outer_polygon.contains(pt) for pt in chunk_points])
+        
+        if not np.any(contained_mask):
+            continue
+            
+        valid_chunk = chunk[contained_mask]
+        valid_points = [chunk_points[j] for j, mask in enumerate(contained_mask) if mask]
+        
+        # 🤖 Claude: Batch query for tree overlaps using spatial index
+        tree_buffers = [pt.buffer(tree_radius) for pt in valid_points]
+        overlap_mask = np.array([
+            len(list(existing_tree_spatial_index.query(buffer))) > 0 
+            for buffer in tree_buffers
+        ])
+        
+        non_overlapping_mask = ~overlap_mask
+        if not np.any(non_overlapping_mask):
+            continue
+            
+        final_chunk = valid_chunk[non_overlapping_mask]
+        final_points = [valid_points[j] for j, mask in enumerate(non_overlapping_mask) if mask]
+        
+        # 🤖 Claude: Vectorized distance calculations using KDTree
+        if len(final_chunk) > 0:
+            distances, _ = tree_kdtree.query(final_chunk)
+            
+            # 🤖 Claude: Apply distance thresholds
+            distance_mask = (distances > min_threshold) & (distances < max_threshold)
+            
+            for j, (point, (x, y), distance) in enumerate(zip(final_points, final_chunk, distances)):
+                if not distance_mask[j]:
+                    continue
+                    
+                # 🤖 Claude: Count nearby trees
+                nearby_indices = tree_kdtree.query_ball_point([x, y], nearby_threshold)
+                nearby_count = len(nearby_indices)
+                
+                if nearby_count < MAX_NEARBY_TREES:
+                    potential_positions.append({
+                        "geometry": point,
+                        "x": x,
+                        "y": y,
+                        "distance_to_nearest": distance,
+                        "nearby_tree_count": nearby_count,
+                    })
+    
+    return potential_positions
 
 
 def find_missing_tree_positions(
@@ -294,49 +367,6 @@ def format_results(existing_trees, missing_positions, epsg_metric):
         "existing_tree_coords": existing_coords,
         "summary": generate_summary(existing_coords, clustered_coords),
     }
-
-
-def generate_candidate_positions(
-    outer_polygon, existing_tree_buffers, existing_points, spacing
-):
-    grid_spacing = spacing * GRID_SPACING_MULTIPLIER
-    minx, miny, maxx, maxy = outer_polygon.bounds
-    x_coords = np.arange(minx, maxx + grid_spacing, grid_spacing)
-    y_coords = np.arange(miny, maxy + grid_spacing, grid_spacing)
-
-    min_threshold = spacing * MIN_DISTANCE_MULTIPLIER
-    max_threshold = spacing * MAX_DISTANCE_MULTIPLIER
-
-    potential_positions = []
-
-    for y in y_coords:
-        for x in x_coords:
-            test_point = Point(x, y)
-
-            if not outer_polygon.contains(test_point):
-                continue
-
-            if any(buffer.contains(test_point) for buffer in existing_tree_buffers):
-                continue
-
-            distances = np.linalg.norm(existing_points - [x, y], axis=1)
-            min_distance = np.min(distances)
-
-            if min_threshold < min_distance < max_threshold:
-                nearby_trees = np.sum(distances < spacing * NEARBY_SEARCH_MULTIPLIER)
-
-                if nearby_trees < MAX_NEARBY_TREES:
-                    potential_positions.append(
-                        {
-                            "geometry": test_point,
-                            "x": x,
-                            "y": y,
-                            "distance_to_nearest": min_distance,
-                            "nearby_tree_count": nearby_trees,
-                        }
-                    )
-
-    return potential_positions
 
 
 def generate_summary(existing_coords, clustered_coords):

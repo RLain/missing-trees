@@ -178,5 +178,6 @@ pyrightconfig.json
 # Added by Becca
 src/tree_survey_data.json
 tmp/tree_gaps_map.html
+tree_gaps_map.html
 node_modules
 .aws-sam

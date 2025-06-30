@@ -244,15 +244,18 @@ def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
     existing_coords = extract_tree_coordinates(existing_trees)
     existing_points = np.array(existing_coords)
 
+    print("......Creating tree buffers")
     tree_radius = spacing * TREE_RADIUS_MULTIPLIER
     existing_tree_buffers = create_tree_buffers(existing_coords, tree_radius)
 
+    print("......Generating candidate position (too slow")
     potential_positions = generate_candidate_positions(
-        outer_polygon, existing_tree_buffers, existing_points, spacing
-    )
+        outer_polygon, existing_tree_buffers, existing_points, spacing)
 
+    print("......Generating inner boundary")
     inner_boundary = create_inner_boundary(outer_polygon, spacing)
 
+    print("......Filtering positions within inner boundary (too slow)")
     return filter_positions_within_inner_boundary(
         potential_positions, inner_boundary, existing_coords, spacing
     )

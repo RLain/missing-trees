@@ -39,7 +39,7 @@ Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as
 curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
 ```
 
-NB: The API is unacceptably slow (sorry). Have patience with ...Finding missing trees. This takes a long ol' time but will give a response!
+NB: The API is unacceptably slow (sorry). Have patience with `...Finding missing trees`. This takes a long ol' time but will give a response!
 ```bash
 START RequestId: 2944f11c-c41d-42f6-8a41-18999d3c0c7b Version: $LATEST
 Missing tree handler invoked...
@@ -59,6 +59,7 @@ Returning 200 OK
 END RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7
 REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  Duration: 241573.03 ms     Billed Duration: 241574 ms      Memory Size: 128 MB     Max Memory Used: 128 MB
 ```
+8. Once finished run $ make clean_sam_build_containers
 
 Additional commands:
 - Exiting a docker container $ exit

@@ -5,22 +5,23 @@ Resources:
   MissingTreesFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: MissingTreesFunction
-      Runtime: python3.11
-      Handler: src.api.handler.missing_trees
-      Timeout: 600
       CodeUri: .
+      Environment:
+        Variables:
+          AEROBOTICS_API_KEY: dummy-value-for-example-of-env-var
       Events:
         MissingTreesApiBase:
           Type: Api
           Properties:
-            Path: /orchard
             Method: get
+            Path: /orchard
         MissingTreesApi:
           Type: Api
           Properties:
-            Path: /orchard/{orchard_id}
             Method: get
-      Environment:
-        Variables:
-          AEROBOTICS_API_KEY: dummy-value-for-local-testing
+            Path: /orchard/{orchard_id}
+      FunctionName: MissingTreesFunction
+      Handler: src.api.handler.missing_trees
+      MemorySize: 2048
+      Runtime: python3.11
+      Timeout: 600

@@ -1,9 +1,23 @@
+build:
+	docker build -t missing_trees .
+
 build_sam:
 	sam build --use-container --cached
 
 clean:
+	@echo "Removing .pycaches..."
 	find . -name "__pycache__" -exec rm -rf {} + -o -name "*.pyc" -delete
+	@echo "Removing .aws-sam..."
 	rm -rf .aws-sam
+
+clean_sam_build_containers:
+	@echo "Stopping and removing containers using SAM build image..."
+	@docker ps -a --filter ancestor=public.ecr.aws/sam/build-python3.11:latest-x86_64 --format "{{.ID}}" | \
+	while read cid; do \
+		echo "Removing container $$cid"; \
+		docker rm -f $$cid; \
+	done
+	@echo "Done"
 
 lint:
 	docker run --rm -v "${PWD}:/app" -w /app missing_trees flake8 src tests

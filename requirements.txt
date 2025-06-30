@@ -11,6 +11,7 @@ pyproj
 pytest
 pytest-asyncio
 requests
+scipy
 shapely
 
 # [1] {RL 29/06/25} sam build --use-container uses AWS’s official Lambda build image (based on Amazon Linux).

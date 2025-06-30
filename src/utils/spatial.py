@@ -37,11 +37,11 @@ def build_outer_polygon_from_survey(survey: dict) -> Polygon:
 def cluster_missing_coords(missing_coords):
     if not missing_coords:
         return []
-    
+
     # 🤖 Claude: Use spatial indexing for clustering
     points = np.array([[coord["x"], coord["y"]] for coord in missing_coords])
     tree = cKDTree(points)
-    
+
     clustered = []
     used = set()
 
@@ -52,10 +52,10 @@ def cluster_missing_coords(missing_coords):
         # 🤖 Claude: Find all points within threshold distance
         indices = tree.query_ball_point([coord1["x"], coord1["y"]], OVERLAP_THRESHOLD_METRES)
         cluster_indices = [idx for idx in indices if idx not in used]
-        
+
         if not cluster_indices:
             continue
-            
+
         cluster = [missing_coords[idx] for idx in cluster_indices]
         used.update(cluster_indices)
         clustered.append(collapse_cluster(cluster))
@@ -81,7 +81,7 @@ def collapse_cluster(cluster):
 def create_custom_buffer(polygon, normal_buffer, bottom_buffer, left_buffer):
     minx, miny, maxx, maxy = polygon.bounds
     width, height = maxx - minx, maxy - miny
-    htol, vtol = width * 0.1, height * 0.1 # {RL 28/05/2025} 10% buffer
+    htol, vtol = width * 0.1, height * 0.1  # {RL 28/05/2025} 10% buffer
     cx, cy = minx + width / 2, miny + height / 2
 
     def move_point(x, y):
@@ -226,7 +226,7 @@ def filter_positions_within_inner_boundary(
         # 🤖 Claude: Use spatial index for faster intersection checks
         test_buffer = pos["geometry"].buffer(final_check_radius)
         nearby_trees = list(existing_tree_spatial_index.query(test_buffer))
-        
+
         if not any(test_buffer.intersects(tree_geom.buffer(overlap_check_radius)) for tree_geom in nearby_trees):
             filtered_positions.append(pos)
 
@@ -236,7 +236,7 @@ def filter_positions_within_inner_boundary(
 def find_gaps_in_orchard(existing_trees, outer_polygon, spacing):
     existing_coords = extract_tree_coordinates(existing_trees)
     existing_points = np.array(existing_coords)
-    
+
     print("......Creating tree buffers")
     tree_geometries = [Point(x, y) for x, y in existing_coords]
     existing_tree_spatial_index = STRtree(tree_geometries)
@@ -262,66 +262,66 @@ def generate_candidate_positions_optimized(
     """Optimized version using spatial indexing and vectorized operations"""
     grid_spacing = spacing * GRID_SPACING_MULTIPLIER
     minx, miny, maxx, maxy = outer_polygon.bounds
-    
+
     # 🤖 Claude: Create grid points
     x_coords = np.arange(minx, maxx + grid_spacing, grid_spacing)
     y_coords = np.arange(miny, maxy + grid_spacing, grid_spacing)
-    
+
     # 🤖 Claude: Create meshgrid for vectorized operations
     X, Y = np.meshgrid(x_coords, y_coords)
     grid_points = np.column_stack([X.ravel(), Y.ravel()])
-    
+
     tree_radius = spacing * TREE_RADIUS_MULTIPLIER
     min_threshold = spacing * MIN_DISTANCE_MULTIPLIER
     max_threshold = spacing * MAX_DISTANCE_MULTIPLIER
     nearby_threshold = spacing * NEARBY_SEARCH_MULTIPLIER
-    
+
     potential_positions = []
-    
+
     # 🤖 Claude: Process in chunks to manage memory
     chunk_size = 10000
     for i in range(0, len(grid_points), chunk_size):
-        chunk = grid_points[i:i+chunk_size]
-        
+        chunk = grid_points[i:i + chunk_size]
+
         # 🤖 Claude: Vectorized polygon containment check
         chunk_points = [Point(x, y) for x, y in chunk]
         contained_mask = np.array([outer_polygon.contains(pt) for pt in chunk_points])
-        
+
         if not np.any(contained_mask):
             continue
-            
+
         valid_chunk = chunk[contained_mask]
         valid_points = [chunk_points[j] for j, mask in enumerate(contained_mask) if mask]
-        
+
         # 🤖 Claude: Batch query for tree overlaps using spatial index
         tree_buffers = [pt.buffer(tree_radius) for pt in valid_points]
         overlap_mask = np.array([
-            len(list(existing_tree_spatial_index.query(buffer))) > 0 
+            len(list(existing_tree_spatial_index.query(buffer))) > 0
             for buffer in tree_buffers
         ])
-        
+
         non_overlapping_mask = ~overlap_mask
         if not np.any(non_overlapping_mask):
             continue
-            
+
         final_chunk = valid_chunk[non_overlapping_mask]
         final_points = [valid_points[j] for j, mask in enumerate(non_overlapping_mask) if mask]
-        
+
         # 🤖 Claude: Vectorized distance calculations using KDTree
         if len(final_chunk) > 0:
             distances, _ = tree_kdtree.query(final_chunk)
-            
+
             # 🤖 Claude: Apply distance thresholds
             distance_mask = (distances > min_threshold) & (distances < max_threshold)
-            
+
             for j, (point, (x, y), distance) in enumerate(zip(final_points, final_chunk, distances)):
                 if not distance_mask[j]:
                     continue
-                    
+
                 # 🤖 Claude: Count nearby trees
                 nearby_indices = tree_kdtree.query_ball_point([x, y], nearby_threshold)
                 nearby_count = len(nearby_indices)
-                
+
                 if nearby_count < MAX_NEARBY_TREES:
                     potential_positions.append({
                         "geometry": point,
@@ -330,7 +330,7 @@ def generate_candidate_positions_optimized(
                         "distance_to_nearest": distance,
                         "nearby_tree_count": nearby_count,
                     })
-    
+
     return potential_positions
 
 

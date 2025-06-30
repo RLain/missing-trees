@@ -73,11 +73,16 @@ Additional commands:
 - To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
 - To check NPM packages intall on container: $ npm list -g --depth=0
 
+## Linting
+
+1. First run $ make build
+2. Then run $ make lint
+
 ## Testing
 
 ### Unit tests
 
-Unit tests are located in the `src/tests` folder.
+Unit tests are located in the `src/tests/unit` folder.
 To run unit tests run `$ make test`
 
 You shoud see an outcome similar to:

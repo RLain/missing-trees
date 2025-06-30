@@ -1,3 +1,6 @@
+build:
+	docker build -t missing_trees .
+
 build_sam:
 	sam build --use-container --cached
 

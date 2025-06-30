@@ -1,6 +1,5 @@
 from src.clients.aerobotics_api_client import AeroboticsAPIClient
 from src.utils.helpers import convert_result_to_analysis, orchard_result_to_dict
-from src.utils.time_utils import log_elapsed_time_in_ms, start_time_in_ms
 from src.validation.aerobotics import (
     validate_survey_response,
     validate_tree_survey_response,
@@ -15,6 +14,7 @@ from src.utils.spatial import (
 )
 import asyncio
 import json
+
 
 def missing_trees(event, context):
     print("Missing tree handler invoked...")
@@ -94,9 +94,7 @@ async def missing_trees_async(event, context):
         print("...Creating tree polygons")
         tree_polygons = create_tree_polygons(tree_data)
         print("...Finding missing trees")
-        start = start_time_in_ms()
         results = find_missing_tree_positions(tree_data, outer_polygon)
-        log_elapsed_time_in_ms(start, f"Processed find_missing_tree_positions")
 
         print("Creating orchard map...")
         #  {RL 28/06/2025} Purely for developer to help debug with visualization

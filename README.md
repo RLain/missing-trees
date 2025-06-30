@@ -5,14 +5,14 @@ This repo is an API that takes in an orchard_id param and returns coordinates fo
 ## 🗣️ Context sharing
 
 - EPSG stands for European Petroleum Survey Group and is a scientific organization that maintains a geodetic parameter database with standard codes
-- EPSG:32734 = UTM Zone 34S (metric) (Source)[https://epsg.io/32734]
-- EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long) (Source)[https://epsg.io/4326]
+- EPSG:32734 = UTM Zone 34S (metric) [Source)](https://epsg.io/32734)
+- EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long) [Source](https://epsg.io/4326)
 - geodetic -> geodesy noun ge·​od·​e·​sy jē-ˈä-də-sē : a branch of applied mathematics concerned with the determination of the size and shape of the earth and the exact positions of points on its surface and with the description of variations of its gravity field
 
 ## ⬇️ Things to install (For Mac)
 
-- (Docker)[https://docs.docker.com/desktop/setup/install/mac-install/]
-- SAM set up. Example using (brew)[https://brew.sh/]
+- [Docker](https://docs.docker.com/desktop/setup/install/mac-install/)
+- SAM set up. Example using [brew](https://brew.sh/)
   - a. $ brew tap aws/tap
   - b. $ brew install aws-sam-cli
 

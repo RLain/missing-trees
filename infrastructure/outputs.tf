@@ -5,7 +5,7 @@ output "app_runner_service_url" {
 
 output "app_runner_service_arn" {
   description = "App Runner service ARN"
-  value       = aws_apprunner_service.missing_trees.service_arn
+  value       = aws_apprunner_service.missing_trees.arn
 }
 
 output "ecr_repository_url" {

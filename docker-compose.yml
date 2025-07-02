@@ -1,1 +1,13 @@
-# Do not think this is required for this code base due to simplicity
+name: missing-trees
+services:
+    missing_trees:
+        ports:
+            - 3000:8080 # Container port is reached via 3000 which is mapped to port 8080 inside the container to the service
+        volumes:
+            - ${PWD}:/app
+        working_dir: /app
+        environment:
+            - FLASK_ENV=development
+            - PYTHONPATH=/app
+        image: missing_trees
+        command: python src/app.py

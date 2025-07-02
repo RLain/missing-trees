@@ -147,11 +147,10 @@ def method_not_allowed(error):
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
+@app.route('/health')
+def health_check():
+    return {'status': 'healthy'}, 200
 
 if __name__ == '__main__':
-    # Development server configuration
-    app.run(
-        host='0.0.0.0',
-        port=int(os.environ.get('PORT', 5000)),
-        debug=os.environ.get('FLASK_ENV') == 'development'
-    )
+    port = int(os.environ.get('PORT', 8080))
+    app.run(host='0.0.0.0', port=port, debug=True)

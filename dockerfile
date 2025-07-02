@@ -11,10 +11,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-# {RL 02/07/25} Create temp directory for map files
 RUN mkdir -p temp
 
-EXPOSE 5000
+EXPOSE 8080
 
 ENV PYTHONPATH=/app
 

@@ -17,7 +17,7 @@ paths:
         
         #### Example `curl` request:
         ```bash
-        curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/216269
+        curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
         ```
       security:
         - bearerAuth: []

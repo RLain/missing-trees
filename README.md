@@ -27,53 +27,18 @@ Please follow these important first steps:
 1. Clone this repository
 2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
 3. Open docker on your desktop
-4. $ make build_sam - _note to give this a moment or roughly 3 mins 40 seconds, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
-```bash
-Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
-/tmp/samcli/source:ro,delegated, inside runtime container  
-...
-Build Succeeded
-```
-5. Run $ sam validate - this should pass with `is a valid SAM Template`
-6. Run $ make start_api
+4. $ make build
+6. Run $ make run
 7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
 ```bash
-curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
 ```
-
-NB: The API is unacceptably slow at approx 45s response time (sorry).
-```bash
-START RequestId: 2944f11c-c41d-42f6-8a41-18999d3c0c7b Version: $LATEST
-Missing tree handler invoked... # This takes a moment to appear...
-Setting up AeroboticsAPIClient and invoking API...
-** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys?orchard_id=216269
-** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys/25319/tree_surveys/
-Kicking off spatial calculations...
-...Creating outer polygon
-...Creating inner boundary
-...Creating tree polygons
-Total input trees: 508
-...Finding missing trees
-Identified 4 missing trees
-Creating orchard map...
-Analysing results...
-Returning 200 OK
-END RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7
-REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  Duration: 241573.03 ms     Billed Duration: 241574 ms      Memory Size: 128 MB     Max Memory Used: 128 MB
-```
-8. Keen to see the visualisation map? 
-```bash
-docker ps # To get the <container-name>
-docker cp <container-name>:/tmp/tree_gaps_map.html ./tree_gaps_map.html
-```
-9. Once finished CMD + Q to end sam and then run $ make clean_sam_build_containers
+8. Once finished CMD + Q to end sam and then run $ make clean
 
 
 Additional commands:
 - Exiting a docker container $ exit
 - To see python packages intalled on the running container $ pip list
-- To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
-- To check NPM packages intall on container: $ npm list -g --depth=0
 
 ## Linting
 

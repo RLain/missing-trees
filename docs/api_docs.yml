@@ -5,7 +5,7 @@ info:
   description: API to retrieve missing tree data for a specific orchard.
 
 servers:
-  - url: http://localhost:3000
+  - url: http://localhost:8080
 
 paths:
   /orchard/{orchard_id}:
@@ -17,7 +17,7 @@ paths:
         
         #### Example `curl` request:
         ```bash
-        curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
+        curl -H "Authorization: Bearer your-bearer-token" http://localhost:8080/api/orchards/your-orchard-id/missing-trees
         ```
       security:
         - bearerAuth: []

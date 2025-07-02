@@ -5,6 +5,7 @@ flask
 flake8
 folium
 geopandas
+gunicorn
 numpy
 pandas
 pyproj

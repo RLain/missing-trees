@@ -157,15 +157,17 @@ resource "aws_apprunner_service" "missing_trees" {
   }
 
   health_check_configuration {
-    healthy_threshold   = 1
-    interval            = 10
-    path               = var.health_check_path
-    protocol           = "HTTP"
-    timeout            = 5
-    unhealthy_threshold = 5
-  }
+    healthy_threshold    = 1
+    unhealthy_threshold  = 15
+    interval             = 15
+    timeout              = 20
+    path                 = var.health_check_path
+    protocol             = "HTTP"
+}
 
   tags = var.tags
 
-  depends_on = [aws_iam_role_policy_attachment.apprunner_access_role_policy, null_resource.docker_build_push]
+  depends_on = [
+    aws_iam_role_policy_attachment.apprunner_access_role_policy, 
+    null_resource.docker_build_push]
 }

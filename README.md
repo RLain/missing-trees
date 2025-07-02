@@ -26,7 +26,7 @@ Please follow these important first steps:
 6. Run $ make run_detached
 7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
 ```bash
-curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:8080/api/orchards/your-orchard-id/missing-trees
 ```
 8. Once finished $ make stop
 

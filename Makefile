@@ -11,7 +11,7 @@ lint:
 	docker run --rm -v "${PWD}:/app" -w /app missing_trees flake8 src tests
 
 run:
-	docker compose -f docker-compose.yml up -d
+	docker compose -f docker-compose.yml up
 
 run_detached:
 	docker compose -f docker-compose.yml up -d 

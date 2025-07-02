@@ -1,27 +1,46 @@
 from flask import Flask, request, jsonify
 from functools import wraps
 import asyncio
-import json
 import logging
 import os
+import sys
 
-from src.clients.aerobotics_api_client import AeroboticsAPIClient
-from src.utils.helpers import convert_result_to_analysis, orchard_result_to_dict
-from src.validation.aerobotics import (
-    validate_survey_response,
-    validate_tree_survey_response,
-)
-from src.utils.api_error import ApiError
-from src.utils.visualisation import create_orchard_map
-from src.utils.spatial import (
-    build_outer_polygon_from_survey,
-    create_tree_polygons,
-    find_missing_tree_positions,
-    inner_boundary_visualisation,
-)
+print("Starting Flask app...", file=sys.stdout, flush=True)
 
+try:
+    from src.clients.aerobotics_api_client import AeroboticsAPIClient
+    from src.utils.helpers import convert_result_to_analysis, orchard_result_to_dict
+    from src.validation.aerobotics import (
+        validate_survey_response,
+        validate_tree_survey_response,
+    )
+    from src.utils.api_error import ApiError
+    from src.utils.visualisation import create_orchard_map
+    from src.utils.spatial import (
+        build_outer_polygon_from_survey,
+        create_tree_polygons,
+        find_missing_tree_positions,
+        inner_boundary_visualisation,
+    )
+    print("All imports successful", file=sys.stdout, flush=True)
+except Exception as e:
+    print(f"Import failed: {e}", file=sys.stderr, flush=True)
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+# Create the Flask app
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
+
+print("Flask app created", file=sys.stdout, flush=True)
+
+# AWS environment check should be AFTER app creation
+if os.environ.get('AWS_EXECUTION_ENV') or os.environ.get('AWS_REGION'):
+    print("AWS environment detected, adding startup buffer...")
+    import time
+    time.sleep(10)
+    print("Startup buffer complete")
 
 def async_route(f):
     @wraps(f)
@@ -29,12 +48,15 @@ def async_route(f):
         return asyncio.run(f(*args, **kwargs))
     return wrapper
 
-
 def extract_bearer_token():
     auth_header = request.headers.get('Authorization', '')
     if not auth_header.startswith('Bearer '):
         return None
     return auth_header.replace('Bearer ', '')
+
+@app.route('/health')
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
 
 
 @app.route('/api/orchards/<orchard_id>/missing-trees', methods=['GET'])
@@ -147,9 +169,4 @@ def method_not_allowed(error):
 def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
-@app.route('/health')
-def health_check():
-    return {'status': 'healthy'}, 200
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=False)
+print("App setup complete", file=sys.stdout, flush=True)

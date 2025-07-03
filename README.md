@@ -22,7 +22,7 @@ Please follow these important first steps:
 1. Clone this repository
 2. Open docker on your desktop
 3. Run $ make run
-4. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
+4. Once you see `api-1  | App setup complete` then in a separate terminal run 
 ```bash
 # For health check
 curl http://localhost:3000/health

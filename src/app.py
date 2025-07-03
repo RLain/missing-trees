@@ -113,7 +113,7 @@ def missing_trees(orchard_id: str):
         }), 500
 
     finally:
-        await client.close()
+        client.close()
 
 
 @app.errorhandler(404)

@@ -1,13 +1,10 @@
-print(">>> aerobotics_api_client.py loaded", flush=True)
 import requests
 from src.utils.api_error import ApiError
 from src.utils.time_utils import start_time_in_ms, log_elapsed_time_in_ms
 
-print(">>> aerobotics_api_client.py loaded", flush=True)
 
 class AeroboticsAPIClient:
     def __init__(self, bearer_token: str):
-        print(">>> AeroboticsAPIClient initialized", flush=True)
         self.base_url = "https://api.aerobotics.com"
         self.headers = {
             "Accept": "application/json",

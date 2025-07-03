@@ -29,9 +29,8 @@ cd /opt/${app_name}
 
 # Create docker-compose.yml
 cat > docker-compose.yml << EOF
-version: '3.8'
 services:
-  flask-api:
+  missing-tree-api:
     build: .
     ports:
       - "3000:5000"

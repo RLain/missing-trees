@@ -13,16 +13,14 @@ provider "aws" {
   region = var.aws_region
 }
 
-
-
-# Data sources
+# Data source to get the latest Ubuntu 22.04 LTS AMI
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"] # Canonical
 
   filter {
     name   = "name"
-    values = ["ubuntu/images/hvm-ssd/ubuntu-22.04-amd64-server-*"]
+    values = ["ubuntu/images/hvm-ssd/ubuntu-jammy-22.04-amd64-server-*"]
   }
 
   filter {
@@ -32,16 +30,16 @@ data "aws_ami" "ubuntu" {
 }
 
 # Security Group
-resource "aws_security_group" "flask_sg" {
+resource "aws_security_group" "missing_tree_sg" {
   name_prefix = "${var.app_name}-sg"
-  description = "Security group for Flask API"
+  description = "Security group for Missing Tree API"
 
   ingress {
     description = "SSH"
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.allowed_ssh_cidr
   }
 
   ingress {
@@ -61,9 +59,9 @@ resource "aws_security_group" "flask_sg" {
   }
 
   ingress {
-    description = "Flask App"
-    from_port   = 5000
-    to_port     = 5000
+    description = "Missing Tree App"
+    from_port   = 3000
+    to_port     = 3000
     protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
   }
@@ -106,16 +104,18 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 # User Data Script
 locals {
   user_data = base64encode(templatefile("${path.module}/user_data.sh", {
-    app_name = var.app_name
+    app_name          = var.app_name
+    repository_url    = var.repository_url
+    repository_branch = var.repository_branch
   }))
 }
 
 # EC2 Instance
-resource "aws_instance" "flask_app" {
+resource "aws_instance" "missing_tree_app" {
   ami                    = data.aws_ami.ubuntu.id
   instance_type          = var.instance_type
   key_name               = var.key_name
-  security_groups        = [aws_security_group.flask_sg.name]
+  security_groups        = [aws_security_group.missing_tree_sg.name]
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
   user_data              = local.user_data
 
@@ -127,20 +127,4 @@ resource "aws_instance" "flask_app" {
   tags = {
     Name = "${var.app_name}-instance"
   }
-}
-
-# Outputs
-output "instance_public_ip" {
-  description = "Public IP address of the EC2 instance"
-  value       = aws_instance.flask_app.public_ip
-}
-
-output "instance_public_dns" {
-  description = "Public DNS name of the EC2 instance"
-  value       = aws_instance.flask_app.public_dns
-}
-
-output "flask_api_url" {
-  description = "Flask API URL"
-  value       = "http://${aws_instance.flask_app.public_ip}:5000"
 }

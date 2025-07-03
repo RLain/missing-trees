@@ -5,8 +5,6 @@ import logging
 import os
 import sys
 
-print("Starting Flask app...", file=sys.stdout, flush=True)
-
 try:
     from src.clients.aerobotics_api_client import AeroboticsAPIClient
     from src.utils.helpers import convert_result_to_analysis, orchard_result_to_dict
@@ -29,24 +27,10 @@ except Exception as e:
     traceback.print_exc()
     sys.exit(1)
 
-# Create the Flask app
+
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
 
-print("Flask app created", file=sys.stdout, flush=True)
-
-# AWS environment check should be AFTER app creation
-if os.environ.get('AWS_EXECUTION_ENV') or os.environ.get('AWS_REGION'):
-    print("AWS environment detected, adding startup buffer...")
-    import time
-    time.sleep(10)
-    print("Startup buffer complete")
-
-def async_route(f):
-    @wraps(f)
-    def wrapper(*args, **kwargs):
-        return asyncio.run(f(*args, **kwargs))
-    return wrapper
 
 def extract_bearer_token():
     auth_header = request.headers.get('Authorization', '')
@@ -54,14 +38,14 @@ def extract_bearer_token():
         return None
     return auth_header.replace('Bearer ', '')
 
+
 @app.route('/health')
 def health_check():
     return jsonify({'status': 'healthy'}), 200
 
 
 @app.route('/api/orchards/<orchard_id>/missing-trees', methods=['GET'])
-@async_route
-async def missing_trees(orchard_id: str):
+def missing_trees(orchard_id: str):
     app.logger.info(f"Missing tree endpoint invoked for orchard: {orchard_id}")
     
     bearer_token = extract_bearer_token()
@@ -72,8 +56,7 @@ async def missing_trees(orchard_id: str):
     client = AeroboticsAPIClient(bearer_token)
     
     try:
-        # Get survey data
-        survey = await client.get_survey(orchard_id)
+        survey = client.get_survey(orchard_id)
         valid, error_msg = validate_survey_response(survey)
         if not valid:
             return jsonify({
@@ -82,15 +65,13 @@ async def missing_trees(orchard_id: str):
 
         survey_id = survey["results"][0]["id"]
 
-        # Get tree survey data
-        tree_survey = await client.get_tree_survey(survey_id)
+        tree_survey = client.get_tree_survey(survey_id)
         valid, error_msg = validate_tree_survey_response(tree_survey)
         if not valid:
             return jsonify({
                 "error": f"The upstream data source did not return required fields: {error_msg}"
             }), 500
 
-        # Process tree data
         tree_data = [
             {
                 "lat": tree["lat"],
@@ -150,9 +131,6 @@ async def missing_trees(orchard_id: str):
                 "status": 500
             }
         }), 500
-
-    finally:
-        await client.close()
 
 
 @app.errorhandler(404)

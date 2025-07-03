@@ -29,6 +29,16 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+# Elastic IP
+resource "aws_eip" "app_eip" {
+  instance = aws_instance.missing_tree_app.id
+  domain   = "vpc"
+  
+  tags = {
+    Name = "${var.app_name}-eip"
+  }
+}
+
 # Security Group
 resource "aws_security_group" "missing_tree_sg" {
   name_prefix = "${var.app_name}-sg"

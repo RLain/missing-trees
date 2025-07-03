@@ -5,10 +5,34 @@ info:
   description: API to retrieve missing tree data for a specific orchard.
 
 servers:
-  - url: http://localhost:3000
+  - url: http://13.247.146.98:3000
 
 paths:
-  /orchard/{orchard_id}:
+  /health:
+    get:
+      summary: Health check
+      description: |
+        Returns the health status of the API.
+
+        #### Example `curl` request:
+        ```bash
+        curl http://13.247.146.98:3000/health
+        ```
+      responses:
+        '200':
+          description: API is healthy
+          content:
+            application/json:
+              example:
+                status: healthy
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    example: healthy
+
+  /api/orchard/{orchard_id}:
     get:
       summary: Get missing tree data for a specific orchard
       description: |
@@ -17,7 +41,7 @@ paths:
         
         #### Example `curl` request:
         ```bash
-        curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
+        curl -H "Authorization: Bearer your-bearer-token" http://13.247.146.98:3000/api/orchards/your-orchard-id/missing-trees
         ```
       security:
         - bearerAuth: []

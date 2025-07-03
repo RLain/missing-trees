@@ -1,5 +1,10 @@
 # Outputs
 
+output "elastic_ip" {
+  value = aws_eip.app_eip.public_ip
+  description = "Static IP for missing tree app"
+}
+
 output "instance_public_dns" {
   description = "Public DNS name of the EC2 instance"
   value       = aws_instance.missing_tree_app.public_dns

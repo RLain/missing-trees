@@ -3,7 +3,7 @@ from src.utils.api_error import ApiError
 from src.utils.time_utils import start_time_in_ms, log_elapsed_time_in_ms
 
 
-class AeroboticsClient:
+class AeroboticsAPIClient:
     def __init__(self, bearer_token: str):
         self.base_url = "https://api.aerobotics.com"
         self.headers = {

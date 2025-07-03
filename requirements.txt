@@ -5,6 +5,7 @@ geopandas
 gunicorn
 numpy
 pandas
+pyproj
 pytest
 pytest-asyncio
 requests

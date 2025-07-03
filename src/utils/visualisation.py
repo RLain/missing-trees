@@ -4,9 +4,7 @@ from shapely.geometry import Polygon
 
 
 def create_orchard_map(
-    tree_polygons: List,
     outer_polygon: Polygon,
-    inner_boundary: Polygon,
     missing_points: Optional[List[Dict]] = None,
 ) -> folium.Map:
     centroid = outer_polygon.centroid
@@ -26,32 +24,6 @@ def create_orchard_map(
             "opacity": 0.8,
         },
     ).add_to(folium_map)
-
-    folium.GeoJson(
-        inner_boundary,
-        name="Inner Boundary",
-        style_function=lambda x: {
-            "color": "pink",
-            "fill": False,
-            "weight": 3,
-            "opacity": 0.8,
-        },
-    ).add_to(folium_map)
-
-    if tree_polygons:
-        tree_polygon_group = folium.FeatureGroup(name="Tree Crowns")
-        for i, tree_area in enumerate(tree_polygons):
-            folium.GeoJson(
-                tree_area,
-                style_function=lambda x: {
-                    "color": "darkgreen",
-                    "weight": 1,
-                    "fillColor": "green",
-                    "fillOpacity": 0.3,
-                },
-                tooltip=f"Tree Crown {i+1}",
-            ).add_to(tree_polygon_group)
-        tree_polygon_group.add_to(folium_map)
 
     if missing_points:
         missing_group = folium.FeatureGroup(name="Missing Trees")

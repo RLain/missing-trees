@@ -20,27 +20,29 @@ Please follow these important first steps:
 
 0. Install [Docker](https://docs.docker.com/desktop/setup/install/mac-install/)
 1. Clone this repository
-2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
-3. Open docker on your desktop
-4. $ make build
-6. Run $ make run_detached
-7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
+2. Open docker on your desktop
+3. Run $ make run
+4. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
 ```bash
-curl -H "Authorization: Bearer your-bearer-token" http://localhost:8080/api/orchards/your-orchard-id/missing-trees
+# For health check
+curl http://localhost:3000/health
+
+# For missing-trees check
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
 ```
-8. Once finished $ make stop
+5. Once finished $ make stop
 
 
 Additional commands:
 - Exiting a docker container $ exit
 - To see python packages intalled on the running container $ pip list
 
-## Linting
+## 🧹 Linting
 
 1. First run $ make build
 2. Then run $ make lint
 
-## Testing
+## 🧪 Testing
 
 ### Unit tests
 
@@ -70,16 +72,23 @@ src/tests/utils/test_timer.py::test_log_elapsed_time_in_ms_logs_message PASSED [
 
 _To be added_
 
-## Deploying to AWS
-
-
-## ⬇️ Things to install (For Mac)
+## 🚀 Deploying to AWS
 
 0. Ensure you have 
   a. Terraform installed. See steps under above "Things to install (For Mac)"
   - $ brew tap hashicorp/tap
   - $ brew install hashicorp/tap/terraform
   b. Have configured your AWS keys locally using $ aws configure
-1. Run $ terraform_init
+1. Set up /infrastructure/terraform.tfvars using the .example file provided
+1. Run $ make terraform_init
 2. Run $ make terraform_plan and follow prompts
 3. Run $ make terraform_apply and follow prompts
+
+## 🚮 Tearing down on AWS
+
+0. Ensure you have 
+  a. Terraform installed. See steps under above "Things to install (For Mac)"
+  - $ brew tap hashicorp/tap
+  - $ brew install hashicorp/tap/terraform
+  b. Have configured your AWS keys locally using $ aws configure
+1. Run $ make terraform_destroy and follow prompts

@@ -16,14 +16,15 @@ run:
 run_detached:
 	docker compose -f docker-compose.yml up -d 
 
+shell:
+	docker run --rm -it -v "${PWD}:/app" -w /app -e PYTHONPATH=/app missing_trees /bin/bash
+
 stop:
 	docker compose down
 
 test:
 	docker run --rm -v $(shell pwd):/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
 
-shell:
-	docker run --rm -it -v "${PWD}:/app" -w /app -e PYTHONPATH=/app missing_trees /bin/bash
 
 # Deployment
 
@@ -40,18 +41,5 @@ terraform_plan:
 terraform_apply:
 	cd infrastructure && terraform apply
 
-deploy_image:
-	@echo "Logging into ECR..."
-	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-	@echo "Tagging and pushing image..."
-	docker tag missing_trees:latest $(ECR_REPO):latest
-	docker push $(ECR_REPO):latest
-
-deploy: build deploy-image
-	@echo "Deploying to App Runner..."
-	cd infrastructure && terraform apply -auto-approve
-	@echo "Deployment complete!"
-	cd infrastructure && terraform output app_runner_service_url
-
-destroy:
+terraform_destroy:
 	cd infrastructure && terraform destroy

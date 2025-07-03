@@ -1,19 +1,16 @@
-output "app_runner_service_url" {
-  description = "App Runner service URL"
-  value       = "https://${aws_apprunner_service.missing_trees.service_url}"
+# Outputs
+
+output "instance_public_dns" {
+  description = "Public DNS name of the EC2 instance"
+  value       = aws_instance.missing_tree_app.public_dns
 }
 
-output "app_runner_service_arn" {
-  description = "App Runner service ARN"
-  value       = aws_apprunner_service.missing_trees.arn
+output "instance_public_ip" {
+  description = "Public IP address of the EC2 instance"
+  value       = aws_instance.missing_tree_app.public_ip
 }
 
-output "ecr_repository_url" {
-  description = "ECR repository URL"
-  value       = aws_ecr_repository.missing_trees.repository_url
-}
-
-output "ecr_repository_name" {
-  description = "ECR repository name"
-  value       = aws_ecr_repository.missing_trees.name
+output "missing_tree_api_url" {
+  description = "Missing Tree API URL"
+  value       = "http://${aws_instance.missing_tree_app.public_ip}:5000"
 }

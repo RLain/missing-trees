@@ -177,8 +177,8 @@ pyrightconfig.json
 
 # Added by Becca
 temp
-infrastructure/.terraform.lock.hcl
 infrastructure/.terraform/
 infrastructure/terraform.tfstate
 infrastructure/terraform.tfstate.backup
 infrastructure/.terraform.tfstate.lock.info
+infrastructure/terraform.tfvars

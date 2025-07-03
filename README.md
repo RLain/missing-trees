@@ -37,12 +37,12 @@ Additional commands:
 - Exiting a docker container $ exit
 - To see python packages intalled on the running container $ pip list
 
-## Linting
+## 🧹 Linting
 
 1. First run $ make build
 2. Then run $ make lint
 
-## Testing
+## 🧪 Testing
 
 ### Unit tests
 
@@ -72,10 +72,7 @@ src/tests/utils/test_timer.py::test_log_elapsed_time_in_ms_logs_message PASSED [
 
 _To be added_
 
-## Deploying to AWS
-
-
-## ⬇️ Things to install (For Mac)
+## 🚀 Deploying to AWS
 
 0. Ensure you have 
   a. Terraform installed. See steps under above "Things to install (For Mac)"
@@ -86,3 +83,12 @@ _To be added_
 1. Run $ make terraform_init
 2. Run $ make terraform_plan and follow prompts
 3. Run $ make terraform_apply and follow prompts
+
+## 🚮 Tearing down on AWS
+
+0. Ensure you have 
+  a. Terraform installed. See steps under above "Things to install (For Mac)"
+  - $ brew tap hashicorp/tap
+  - $ brew install hashicorp/tap/terraform
+  b. Have configured your AWS keys locally using $ aws configure
+1. Run $ make terraform_destroy and follow prompts

@@ -12,6 +12,8 @@ COPY requirements.txt .
 # {RL 03/07/2025} --no-cache-dir Installs Python dependencies without caching to reduce image size.
 RUN pip install --no-cache-dir -r requirements.txt 
 
+RUN mkdir -p temp
+
 COPY . .
 
 EXPOSE 5000

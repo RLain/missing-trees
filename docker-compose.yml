@@ -7,3 +7,5 @@ services:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1 # {RL 03/07/2025} Ensures that logs are flushed immediately to the terminal (stdout/stderr), useful for live logging (especially in Docker).
     restart: unless-stopped
+    volumes:
+      - ./temp:/app/temp

@@ -11,7 +11,7 @@ async def sleep(ms: int):
 
 
 def start_time_in_ms() -> float:
-    return time.perf_counter() * 1000  # Convert seconds to milliseconds
+    return time.perf_counter() * 1000
 
 
 def elapsed_time_in_ms(start_time_in_ms: float) -> float:

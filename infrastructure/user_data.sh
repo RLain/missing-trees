@@ -97,3 +97,54 @@ EOF
 # Enable the service
 systemctl daemon-reload
 systemctl enable ${app_name}.service
+
+# -------------------------------
+# Install Nginx and set up SSL
+# -------------------------------
+
+# Install Nginx and OpenSSL
+apt-get install -y nginx openssl
+
+# Create SSL directory
+mkdir -p /etc/ssl/${app_name}
+
+# Get EC2 public IP for certificate SAN
+public_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+
+# Generate self-signed cert
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout /etc/ssl/${app_name}/selfsigned.key \
+  -out /etc/ssl/${app_name}/selfsigned.crt \
+  -subj "/CN=${app_name}" \
+  -addext "subjectAltName=IP:$${public_ip}"
+
+# Create Nginx config
+cat > /etc/nginx/sites-available/${app_name} << EOF
+server {
+    listen 80;
+    return 301 https://\$host\$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    server_name _;
+
+    ssl_certificate     /etc/ssl/${app_name}/selfsigned.crt;
+    ssl_certificate_key /etc/ssl/${app_name}/selfsigned.key;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host \$host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto \$scheme;
+    }
+}
+EOF
+
+# Enable the new site
+ln -s /etc/nginx/sites-available/${app_name} /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+# Restart Nginx
+systemctl restart nginx

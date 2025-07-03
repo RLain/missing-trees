@@ -2,8 +2,8 @@ services:
   api:
     build: .
     ports:
-      - "3000:5000"
+      - "3000:5000" # {RL 03/07/2025} "host_port:container_port"
     environment:
       - FLASK_ENV=production
-      - PYTHONUNBUFFERED=1
+      - PYTHONUNBUFFERED=1 # {RL 03/07/2025} Ensures that logs are flushed immediately to the terminal (stdout/stderr), useful for live logging (especially in Docker).
     restart: unless-stopped

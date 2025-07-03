@@ -8,4 +8,5 @@ services:
       - PYTHONUNBUFFERED=1 # {RL 03/07/2025} Ensures that logs are flushed immediately to the terminal (stdout/stderr), useful for live logging (especially in Docker).
     restart: unless-stopped
     volumes:
-      - ./temp:/app/temp
+      - ./temp:/app/temp # {RL 03/07/2025} Mounts the local temp directory to the container's /app/temp directory, allowing temporary files to persist across container restarts. (orchard map visualization)
+      - ./src:/app/src # {RL 03/07/2025} Mounts the local src directory to the container's /app/src directory, allowing live code updates without rebuilding the image.

@@ -1,9 +1,9 @@
 from flask import Flask, request, jsonify
 from functools import wraps
+import asyncio
 import logging
 import os
 import sys
-
 
 try:
     from src.clients.aerobotics_api_client import AeroboticsAPIClient
@@ -16,13 +16,17 @@ try:
     from src.utils.visualisation import create_orchard_map
     from src.utils.spatial import (
         build_outer_polygon_from_survey,
-        process_tree_analysis
+        create_tree_polygons,
+        find_missing_tree_positions,
+        inner_boundary_visualisation,
     )
+    print("All imports successful", file=sys.stdout, flush=True)
 except Exception as e:
     print(f"Import failed: {e}", file=sys.stderr, flush=True)
     import traceback
     traceback.print_exc()
     sys.exit(1)
+
 
 app = Flask(__name__)
 app.logger.setLevel(logging.INFO)
@@ -68,18 +72,34 @@ def missing_trees(orchard_id: str):
                 "error": f"The upstream data source did not return required fields: {error_msg}"
             }), 500
 
-       
+        tree_data = [
+            {
+                "lat": tree["lat"],
+                "lng": tree["lng"],
+                "area": tree["area"],
+            }
+            for tree in tree_survey["results"]
+        ]
+
         app.logger.info("Kicking off spatial calculations...")
         app.logger.info("...Creating outer polygon")
         outer_polygon = build_outer_polygon_from_survey(survey)
-    
+        
+        app.logger.info("...Creating inner boundary")
+        inner_boundary_geographic = inner_boundary_visualisation(outer_polygon)
+        
+        app.logger.info("...Creating tree polygons")
+        tree_polygons = create_tree_polygons(tree_data)
+        
         app.logger.info("...Finding missing trees")
-        results = process_tree_analysis(tree_survey, survey)
+        results = find_missing_tree_positions(tree_data, outer_polygon)
 
         app.logger.info("Creating orchard map...")
         # {RL 28/06/2025} Purely for developer to help debug with visualization
         folium_map = create_orchard_map(
+            tree_polygons=tree_polygons,
             outer_polygon=outer_polygon,
+            inner_boundary=inner_boundary_geographic,
             missing_points=results["missing_coords"],
         )
         
@@ -111,7 +131,6 @@ def missing_trees(orchard_id: str):
                 "status": 500
             }
         }), 500
-
 
 
 @app.errorhandler(404)

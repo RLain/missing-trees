@@ -6,9 +6,7 @@ apt-get update -y
 apt-get upgrade -y
 
 # Install Docker
-apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release git nginx openssl
-
-# Add Docker GPG key and repo
+apt-get install -y apt-transport-https ca-certificates curl gnupg lsb-release
 curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
 apt-get update -y
@@ -61,20 +59,21 @@ COPY . .
 
 EXPOSE 5000
 
+# Adjust the module path based on your repository structure
 CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "4", "src.app:app"]
 EOF
 
-# Clone app code
+apt-get install -y git
 git clone --branch ${repository_branch} ${repository_url} app
 cd app
 
-# Set permissions
+# Set proper permissions
 chown -R ubuntu:ubuntu /opt/${app_name}
 
 # Build and run the application
 docker-compose up -d
 
-# Create systemd service for Docker Compose
+# Create a simple systemd service to ensure the app starts on boot
 cat > /etc/systemd/system/${app_name}.service << EOF
 [Unit]
 Description=${app_name} Docker Compose Application
@@ -95,27 +94,32 @@ Group=ubuntu
 WantedBy=multi-user.target
 EOF
 
-# Enable the Docker Compose service
+# Enable the service
 systemctl daemon-reload
 systemctl enable ${app_name}.service
 
-# -------------------------------------
-# Self-signed SSL + Nginx proxy setup
-# -------------------------------------
+# -------------------------------
+# Install Nginx and set up SSL
+# -------------------------------
 
-# Get public IP of the instance for SSL SAN
+# Install Nginx and OpenSSL
+apt-get install -y nginx openssl
+
+# Create SSL directory
+mkdir -p /etc/ssl/${app_name}
+
+# Get EC2 public IP for certificate SAN
 public_ip=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 
-# Generate self-signed certificate
-mkdir -p /etc/ssl/missingtree
+# Generate self-signed cert
 openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /etc/ssl/missingtree/selfsigned.key \
-  -out /etc/ssl/missingtree/selfsigned.crt \
+  -keyout /etc/ssl/${app_name}/selfsigned.key \
+  -out /etc/ssl/${app_name}/selfsigned.crt \
   -subj "/CN=${app_name}" \
-  -addext "subjectAltName=IP:${public_ip}"
+  -addext "subjectAltName=IP:$${public_ip}"
 
-# Nginx reverse proxy config
-cat > /etc/nginx/sites-available/missingtree << EOF
+# Create Nginx config
+cat > /etc/nginx/sites-available/${app_name} << EOF
 server {
     listen 80;
     return 301 https://\$host\$request_uri;
@@ -125,8 +129,8 @@ server {
     listen 443 ssl;
     server_name _;
 
-    ssl_certificate     /etc/ssl/missingtree/selfsigned.crt;
-    ssl_certificate_key /etc/ssl/missingtree/selfsigned.key;
+    ssl_certificate     /etc/ssl/${app_name}/selfsigned.crt;
+    ssl_certificate_key /etc/ssl/${app_name}/selfsigned.key;
 
     location / {
         proxy_pass http://localhost:3000;
@@ -138,7 +142,9 @@ server {
 }
 EOF
 
-# Enable Nginx config
-ln -s /etc/nginx/sites-available/missingtree /etc/nginx/sites-enabled/
-rm /etc/nginx/sites-enabled/default
+# Enable the new site
+ln -s /etc/nginx/sites-available/${app_name} /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+
+# Restart Nginx
 systemctl restart nginx

@@ -47,7 +47,9 @@ Additional commands:
 ### Unit tests
 
 Unit tests are located in the `src/tests/unit` folder.
-To run unit tests run `$ make test`
+
+1. First run $ make build
+2. Then run $ make test
 
 You shoud see an outcome similar to:
 

@@ -27,13 +27,13 @@ variable "key_name" {
   type        = string
 }
 
-variable "repository_url" {
-  description = "The URL of the Git repository to clone"
-  type        = string
-}
-
 variable "repository_branch" {
   description = "The branch of the repository to check out"
   type        = string
   default     = "main"
+}
+
+variable "repository_url" {
+  description = "The URL of the Git repository to clone"
+  type        = string
 }

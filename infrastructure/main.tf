@@ -16,7 +16,7 @@ provider "aws" {
 # Data source to get the latest Ubuntu 22.04 LTS AMI
 data "aws_ami" "ubuntu" {
   most_recent = true
-  owners      = ["099720109477"] # Canonical
+  owners      = ["099720109477"]
 
   filter {
     name   = "name"
@@ -78,7 +78,7 @@ resource "aws_security_group" "missing_tree_sg" {
   }
 }
 
-# IAM Role for EC2 (optional - for CloudWatch logs, etc.)
+# IAM Role for EC2
 resource "aws_iam_role" "ec2_role" {
   name = "${var.app_name}-ec2-role"
 

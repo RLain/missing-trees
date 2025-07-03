@@ -42,7 +42,7 @@ services:
       - ./app:/app
 EOF
 
-# Create Dockerfile for your repository structure
+# Create Dockerfile for the repository structure
 cat > Dockerfile << EOF
 FROM python:3.11-slim
 

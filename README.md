@@ -22,11 +22,11 @@ Please follow these important first steps:
 1. Clone this repository
 2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
 3. Open docker on your desktop
-4. $ make build
+4. $ make build  <- ⚠️ NOTE TO SELF - DOUBLE CHECK if necessary
 6. Run $ make run_detached
 7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
 ```bash
-curl -H "Authorization: Bearer your-bearer-token" http://localhost:8080/api/orchards/your-orchard-id/missing-trees
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/api/orchards/your-orchard-id/missing-trees
 ```
 8. Once finished $ make stop
 

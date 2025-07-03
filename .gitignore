@@ -182,3 +182,4 @@ infrastructure/.terraform/
 infrastructure/terraform.tfstate
 infrastructure/terraform.tfstate.backup
 infrastructure/.terraform.tfstate.lock.info
+infrastructure/terraform.tfvars

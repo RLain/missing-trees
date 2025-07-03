@@ -1,3 +1,5 @@
+# terraform/main.tf
+
 terraform {
   required_providers {
     aws = {
@@ -5,51 +7,82 @@ terraform {
       version = "~> 5.0"
     }
   }
-  required_version = ">= 1.0"
 }
 
 provider "aws" {
   region = var.aws_region
 }
 
-# ECR Repository
-resource "aws_ecr_repository" "missing_trees" {
-  name                 = var.ecr_repository_name
-  image_tag_mutability = "MUTABLE"
 
-  image_scanning_configuration {
-    scan_on_push = true
+
+# Data sources
+data "aws_ami" "ubuntu" {
+  most_recent = true
+  owners      = ["099720109477"] # Canonical
+
+  filter {
+    name   = "name"
+    values = ["ubuntu/images/hvm-ssd/ubuntu-22.04-amd64-server-*"]
   }
 
-  tags = var.tags
+  filter {
+    name   = "virtualization-type"
+    values = ["hvm"]
+  }
 }
 
-# ECR Lifecycle Policy
-resource "aws_ecr_lifecycle_policy" "missing_trees" {
-  repository = aws_ecr_repository.missing_trees.name
+# Security Group
+resource "aws_security_group" "flask_sg" {
+  name_prefix = "${var.app_name}-sg"
+  description = "Security group for Flask API"
 
-  policy = jsonencode({
-    rules = [
-      {
-        rulePriority = 1
-        description  = "Keep last 5 images"
-        selection = {
-          tagStatus     = "tagged"
-          tagPrefixList = ["v"]
-          countType     = "imageCountMoreThan"
-          countNumber   = 5
-        }
-        action = {
-          type = "expire"
-        }
-      }
-    ]
-  })
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTP"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "HTTPS"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
+    description = "Flask App"
+    from_port   = 5000
+    to_port     = 5000
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = {
+    Name = "${var.app_name}-security-group"
+  }
 }
 
-# IAM Role for App Runner
-resource "aws_iam_role" "apprunner_instance_role" {
-  name = "${var.service_name}-instance-role"
+# IAM Role for EC2 (optional - for CloudWatch logs, etc.)
+resource "aws_iam_role" "ec2_role" {
+  name = "${var.app_name}-ec2-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -58,116 +91,56 @@ resource "aws_iam_role" "apprunner_instance_role" {
         Action = "sts:AssumeRole"
         Effect = "Allow"
         Principal = {
-          Service = "tasks.apprunner.amazonaws.com"
+          Service = "ec2.amazonaws.com"
         }
       }
     ]
   })
-
-  tags = var.tags
 }
 
-# IAM Role for App Runner Access
-resource "aws_iam_role" "apprunner_access_role" {
-  name = "${var.service_name}-access-role"
-
-  assume_role_policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "build.apprunner.amazonaws.com"
-        }
-      }
-    ]
-  })
-
-  tags = var.tags
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.app_name}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
 }
 
-# Attach ECR access policy
-resource "aws_iam_role_policy_attachment" "apprunner_access_role_policy" {
-  role       = aws_iam_role.apprunner_access_role.name
-  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSAppRunnerServicePolicyForECRAccess"
+# User Data Script
+locals {
+  user_data = base64encode(templatefile("${path.module}/user_data.sh", {
+    app_name = var.app_name
+  }))
 }
 
+# EC2 Instance
+resource "aws_instance" "flask_app" {
+  ami                    = data.aws_ami.ubuntu.id
+  instance_type          = var.instance_type
+  key_name               = var.key_name
+  security_groups        = [aws_security_group.flask_sg.name]
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
+  user_data              = local.user_data
 
-
-# Null resource to build and push Docker image
-resource "null_resource" "docker_build_push" {
-  triggers = {
-    # Only hash files that exist
-    dockerfile_hash = fileexists("${path.module}/../Dockerfile") ? filemd5("${path.module}/../Dockerfile") : "none"
-    package_json_hash = fileexists("${path.module}/../package.json") ? filemd5("${path.module}/../package.json") : "none"
-    # Fallback to timestamp if files don't exist
-    timestamp = timestamp()
+  root_block_device {
+    volume_size = 20
+    volume_type = "gp3"
   }
 
-  provisioner "local-exec" {
-    working_dir = path.module
-    command = <<-EOT
-      # Navigate to project root (assuming infrastructure is a subdirectory)
-      cd ..
-      
-      # Get ECR login
-      aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${aws_ecr_repository.missing_trees.repository_url}
-      
-      # Build image
-      docker build -t ${var.service_name} .
-      
-      # Tag for ECR
-      docker tag ${var.service_name}:latest ${aws_ecr_repository.missing_trees.repository_url}:${var.image_tag}
-      
-      # Push to ECR
-      docker push ${aws_ecr_repository.missing_trees.repository_url}:${var.image_tag}
-    EOT
+  tags = {
+    Name = "${var.app_name}-instance"
   }
-
-  depends_on = [aws_ecr_repository.missing_trees]
 }
 
-# App Runner Service
-resource "aws_apprunner_service" "missing_trees" {
-  service_name = var.service_name
-
-  source_configuration {
-    auto_deployments_enabled = var.auto_deploy_enabled
-    
-    # Authentication configuration for private ECR
-    authentication_configuration {
-      access_role_arn = aws_iam_role.apprunner_access_role.arn
-    }
-    
-    image_repository {
-      image_configuration {
-        port = "8080"
-        runtime_environment_variables = var.environment_variables
-      }
-      image_identifier      = "${aws_ecr_repository.missing_trees.repository_url}:${var.image_tag}"
-      image_repository_type = "ECR"
-    }
-  }
-
-  instance_configuration {
-    cpu               = var.cpu
-    memory            = var.memory
-    instance_role_arn = aws_iam_role.apprunner_instance_role.arn
-  }
-
-  health_check_configuration {
-    healthy_threshold    = 1
-    unhealthy_threshold  = 15
-    interval             = 15
-    timeout              = 20
-    path                 = var.health_check_path
-    protocol             = "HTTP"
+# Outputs
+output "instance_public_ip" {
+  description = "Public IP address of the EC2 instance"
+  value       = aws_instance.flask_app.public_ip
 }
 
-  tags = var.tags
+output "instance_public_dns" {
+  description = "Public DNS name of the EC2 instance"
+  value       = aws_instance.flask_app.public_dns
+}
 
-  depends_on = [
-    aws_iam_role_policy_attachment.apprunner_access_role_policy, 
-    null_resource.docker_build_push]
+output "flask_api_url" {
+  description = "Flask API URL"
+  value       = "http://${aws_instance.flask_app.public_ip}:5000"
 }

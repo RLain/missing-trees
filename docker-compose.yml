@@ -1,13 +1,10 @@
-name: missing-trees
+version: '3.8'
 services:
-  missing_trees:
+  api:
     build: .
     ports:
-      - "8080:8080"
+      - "3000:5000"
     environment:
-      FLASK_ENV: production
-      PYTHONPATH: /app
-    command: >
-      gunicorn --bind 0.0.0.0:8080 src.app:app --access-logfile - --error-logfile - --log-level debug
-
-# {RL 02/07/25} https://www.composerize.com/
+      - FLASK_ENV=production
+      - PYTHONUNBUFFERED=1
+    restart: unless-stopped

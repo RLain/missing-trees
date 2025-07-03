@@ -11,11 +11,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-RUN mkdir -p temp
-RUN python -c "import numpy; import scipy; import geopandas; import folium; print('Libraries preloaded')"
+EXPOSE 5000
 
-EXPOSE 8080
-
-ENV PYTHONPATH=/app
-
-CMD ["gunicorn", "--bind", "0.0.0.0:8080", "app:app", "--access-logfile", "-", "--error-logfile", "-", "--log-level", "debug", "--timeout", "120", "--preload"]
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "src.app:app"]

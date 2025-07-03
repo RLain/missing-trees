@@ -176,8 +176,9 @@ pyrightconfig.json
 # End of https://www.toptal.com/developers/gitignore/api/python
 
 # Added by Becca
-src/tree_survey_data.json
-tmp/tree_gaps_map.html
-tree_gaps_map.html
-node_modules
-.aws-sam
+temp
+infrastructure/.terraform.lock.hcl
+infrastructure/.terraform/
+infrastructure/terraform.tfstate
+infrastructure/terraform.tfstate.backup
+infrastructure/.terraform.tfstate.lock.info

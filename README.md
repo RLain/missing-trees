@@ -9,12 +9,6 @@ This repo is an API that takes in an orchard_id param and returns coordinates fo
 - EPSG: 4326 = is a geographic coordinate system that uses latitude and longitude to define locations on Earth (lat and long) [Source](https://epsg.io/4326)
 - geodetic -> geodesy noun ge·​od·​e·​sy jē-ˈä-də-sē : a branch of applied mathematics concerned with the determination of the size and shape of the earth and the exact positions of points on its surface and with the description of variations of its gravity field
 
-## ⬇️ Things to install (For Mac)
-
-- [Docker](https://docs.docker.com/desktop/setup/install/mac-install/)
-- SAM set up. Example using [brew](https://brew.sh/)
-  - a. $ brew tap aws/tap
-  - b. $ brew install aws-sam-cli
 
 ## 🔢 Things to config _(if applicable)_
 
@@ -24,56 +18,22 @@ This repo is an API that takes in an orchard_id param and returns coordinates fo
 
 Please follow these important first steps:
 
+0. Install [Docker](https://docs.docker.com/desktop/setup/install/mac-install/)
 1. Clone this repository
 2. ~Set up your local `env` file. Use the `.env.sample` to see the required structure.~ Ignore: Sempahore & Serverless not working. 
 3. Open docker on your desktop
-4. $ make build_sam - _note to give this a moment or roughly 3 mins 40 seconds, it takes a bit of time to mount the image to SAM. Please wait for the following to finish:_
-```bash
-Mounting /Users/your_name/Documents/dir_of_the_repo/missing-trees as                       
-/tmp/samcli/source:ro,delegated, inside runtime container  
-...
-Build Succeeded
-```
-5. Run $ sam validate - this should pass with `is a valid SAM Template`
-6. Run $ make start_api
+4. $ make build
+6. Run $ make run_detached
 7. Once you see `* Running on all addresses (0.0.0.0)` then in a separate terminal run 
 ```bash
-curl -H "Authorization: Bearer your-bearer-token" http://localhost:3000/orchard/your_orchard_id
+curl -H "Authorization: Bearer your-bearer-token" http://localhost:8080/api/orchards/your-orchard-id/missing-trees
 ```
-
-NB: The API is unacceptably slow at approx 45s response time (sorry).
-```bash
-START RequestId: 2944f11c-c41d-42f6-8a41-18999d3c0c7b Version: $LATEST
-Missing tree handler invoked... # This takes a moment to appear...
-Setting up AeroboticsAPIClient and invoking API...
-** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys?orchard_id=216269
-** GET : HTTPClient URL: https://api.aerobotics.com/farming/surveys/25319/tree_surveys/
-Kicking off spatial calculations...
-...Creating outer polygon
-...Creating inner boundary
-...Creating tree polygons
-Total input trees: 508
-...Finding missing trees
-Identified 4 missing trees
-Creating orchard map...
-Analysing results...
-Returning 200 OK
-END RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7
-REPORT RequestId: c6d6be20-94b5-4498-b761-1e24614acaa7  Init Duration: 1.55 ms  Duration: 241573.03 ms     Billed Duration: 241574 ms      Memory Size: 128 MB     Max Memory Used: 128 MB
-```
-8. Keen to see the visualisation map? 
-```bash
-docker ps # To get the <container-name>
-docker cp <container-name>:/tmp/tree_gaps_map.html ./tree_gaps_map.html
-```
-9. Once finished CMD + Q to end sam and then run $ make clean_sam_build_containers
+8. Once finished $ make stop
 
 
 Additional commands:
 - Exiting a docker container $ exit
 - To see python packages intalled on the running container $ pip list
-- To run serverless container on terminal: $ docker run --rm -it -v "$(pwd):/app" -w /app my-serverless bash
-- To check NPM packages intall on container: $ npm list -g --depth=0
 
 ## Linting
 
@@ -112,6 +72,14 @@ _To be added_
 
 ## Deploying to AWS
 
-_To be finished_
 
-We use `semaphore` to deploy the middleware. The deployment secrets are stored on `https://rlain.semaphoreci.com/` including AWS and Serverless Framwork.
+## ⬇️ Things to install (For Mac)
+
+0. Ensure you have 
+  a. Terraform installed. See steps under above "Things to install (For Mac)"
+  - $ brew tap hashicorp/tap
+  - $ brew install hashicorp/tap/terraform
+  b. Have configured your AWS keys locally using $ aws configure
+1. Run $ terraform_init
+2. Run $ make terraform_plan and follow prompts
+3. Run $ make terraform_apply and follow prompts

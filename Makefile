@@ -1,55 +1,57 @@
 build:
 	docker build -t missing_trees .
 
-build_sam:
-	sam build --use-container --cached
-
 clean:
 	@echo "Removing .pycaches..."
 	find . -name "__pycache__" -exec rm -rf {} + -o -name "*.pyc" -delete
-	@echo "Removing .aws-sam..."
-	rm -rf .aws-sam
-
-clean_sam_build_containers:
-	@echo "Stopping and removing containers using SAM build image..."
-	@docker ps -a --filter ancestor=public.ecr.aws/sam/build-python3.11:latest-x86_64 --format "{{.ID}}" | \
-	while read cid; do \
-		echo "Removing container $$cid"; \
-		docker rm -f $$cid; \
-	done
-	@echo "Done"
+	@echo "Removing temp files..."
+	rm -rf temp/
 
 lint:
 	docker run --rm -v "${PWD}:/app" -w /app missing_trees flake8 src tests
 
-start_api:
-	sam local start-api --host 0.0.0.0 --port 3000
+run:
+	docker compose -f docker-compose.yml up
 
-start_api_debug:
-	sam local start-api --host 0.0.0.0 --port 3000 --debug
+run_detached:
+	docker compose -f docker-compose.yml up -d 
+
+stop:
+	docker compose down
 
 test:
 	docker run --rm -v $(shell pwd):/app -w /app -e PYTHONPATH=/app missing_trees pytest -v -s tests
 
+shell:
+	docker run --rm -it -v "${PWD}:/app" -w /app -e PYTHONPATH=/app missing_trees /bin/bash
 
-# Archived:______________________
-# build:
-# 	docker build -t missing_trees .
+# Deployment
 
-# build_serverless:
-# 	docker build -t my-serverless -f dockerfile.serverless .
+AWS_ACCOUNT_ID := $(shell aws sts get-caller-identity --query Account --output text)
+AWS_REGION := af-south-1
+ECR_REPO := $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/missing-trees
 
-# invoke_local:
-# 	sam local invoke MissingTreesFunction --event events/test-event.json
+terraform_init:
+	cd infrastructure && terraform init
 
-# invoke_api:
-# 	sls offline start
+terraform_plan:
+	cd infrastructure && terraform plan
 
-# run:
-# 	docker run -it --rm -v "$$PWD":/app -w /app missing_trees bash
+terraform_apply:
+	cd infrastructure && terraform apply
 
-# run_handler:
-# 	docker run --rm -v "$$PWD":/app -v "$$PWD/tmp":/tmp -w /app -e PYTHONPATH=/app missing_trees python src/api/handler.py
+deploy_image:
+	@echo "Logging into ECR..."
+	aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+	@echo "Tagging and pushing image..."
+	docker tag missing_trees:latest $(ECR_REPO):latest
+	docker push $(ECR_REPO):latest
 
-# run_serverless:
-# 	docker run --rm --env-file .env -v "$(shell pwd):/app" -w /app my-serverless npx serverless deploy --stage staging --verbose
+deploy: build deploy-image
+	@echo "Deploying to App Runner..."
+	cd infrastructure && terraform apply -auto-approve
+	@echo "Deployment complete!"
+	cd infrastructure && terraform output app_runner_service_url
+
+destroy:
+	cd infrastructure && terraform destroy
